@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"twitter_golang_backend/internal/auth"
+	"twitter_golang_backend/internal/comment"
 	"twitter_golang_backend/internal/config"
 	"twitter_golang_backend/internal/database"
 	"twitter_golang_backend/internal/post"
@@ -32,6 +33,8 @@ func main() {
 	userHandler := user.NewHandler(userRepository, cfg.SessionSecret)
 	postRepository := post.NewRepository(db)
 	postHandler := post.NewHandler(postRepository, "uploads")
+	commentRepository := comment.NewRepository(db)
+	commentHandler := comment.NewHandler(commentRepository)
 
 	router := chi.NewRouter()
 
@@ -77,6 +80,9 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}", postHandler.Get)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}", postHandler.Delete)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts", postHandler.Create)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}/comments", commentHandler.List)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/comments", commentHandler.Create)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/comments/{id}", commentHandler.Delete)
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	server := &http.Server{
