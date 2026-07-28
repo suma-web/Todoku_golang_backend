@@ -115,6 +115,39 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) ListMine(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+	limit, err := parseNonNegativeQuery(r, "limit", 20)
+	if err != nil || limit < 1 || limit > 100 {
+		writeError(w, http.StatusBadRequest, "INVALID_LIMIT", "limitは1以上100以下の整数で指定してください")
+		return
+	}
+	offset, err := parseNonNegativeQuery(r, "offset", 0)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_OFFSET", "offsetは0以上の整数で指定してください")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	comments, err := h.repository.ListByUserID(ctx, userID, limit+1, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "コメント一覧を取得できませんでした")
+		return
+	}
+	hasMore := len(comments) > limit
+	if hasMore {
+		comments = comments[:limit]
+	}
+	writeJSON(w, http.StatusOK, ListResponse{
+		Comments: comments, Limit: limit, Offset: offset, HasMore: hasMore,
+	})
+}
+
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	commentID, ok := parsePositiveID(chi.URLParam(r, "id"))
 	if !ok {
