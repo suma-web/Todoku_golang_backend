@@ -93,13 +93,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+	userID, _ := auth.UserID(r.Context())
 
 	var posts []Post
 	name := strings.TrimSpace(r.URL.Query().Get("user"))
 	if name == "" {
-		posts, err = h.repository.List(ctx, limit+1, offset)
+		posts, err = h.repository.List(ctx, userID, limit+1, offset)
 	} else {
-		posts, err = h.repository.ListByUserName(ctx, name, limit+1, offset)
+		posts, err = h.repository.ListByUserName(ctx, userID, name, limit+1, offset)
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "投稿一覧を取得できませんでした")
@@ -131,8 +132,9 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+	userID, _ := auth.UserID(r.Context())
 
-	found, err := h.repository.FindByID(ctx, postID)
+	found, err := h.repository.FindByID(ctx, postID, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "POST_NOT_FOUND", "投稿が見つかりません")
@@ -143,6 +145,101 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, found)
+}
+
+func (h *Handler) Retweet(w http.ResponseWriter, r *http.Request) {
+	postID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || postID <= 0 {
+		writeError(w, http.StatusBadRequest, "INVALID_POST_ID", "投稿IDが不正です")
+		return
+	}
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	exists, err := h.repository.PostExists(ctx, postID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "リツイートできませんでした")
+		return
+	}
+	if !exists {
+		writeError(w, http.StatusNotFound, "POST_NOT_FOUND", "投稿が見つかりません")
+		return
+	}
+
+	response, err := h.repository.Retweet(ctx, postID, userID)
+	if err != nil {
+		if errors.Is(err, ErrAlreadyRetweeted) {
+			writeError(w, http.StatusConflict, "ALREADY_RETWEETED", "この投稿はリツイート済みです")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "リツイートできませんでした")
+		return
+	}
+	writeJSON(w, http.StatusCreated, response)
+}
+
+func (h *Handler) UndoRetweet(w http.ResponseWriter, r *http.Request) {
+	postID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || postID <= 0 {
+		writeError(w, http.StatusBadRequest, "INVALID_POST_ID", "投稿IDが不正です")
+		return
+	}
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	response, err := h.repository.UndoRetweet(ctx, postID, userID)
+	if err != nil {
+		if errors.Is(err, ErrNotRetweeted) {
+			writeError(w, http.StatusNotFound, "RETWEET_NOT_FOUND", "この投稿はリツイートされていません")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "リツイートを解除できませんでした")
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (h *Handler) ListMyRetweets(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+	limit, err := parseNonNegativeQuery(r, "limit", 20)
+	if err != nil || limit < 1 || limit > 100 {
+		writeError(w, http.StatusBadRequest, "INVALID_LIMIT", "limitは1以上100以下の整数で指定してください")
+		return
+	}
+	offset, err := parseNonNegativeQuery(r, "offset", 0)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_OFFSET", "offsetは0以上の整数で指定してください")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	posts, err := h.repository.ListRetweetedByUser(ctx, userID, limit+1, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "リツイート一覧を取得できませんでした")
+		return
+	}
+	hasMore := len(posts) > limit
+	if hasMore {
+		posts = posts[:limit]
+	}
+	writeJSON(w, http.StatusOK, ListResponse{
+		Posts: posts, Limit: limit, Offset: offset, HasMore: hasMore,
+	})
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
