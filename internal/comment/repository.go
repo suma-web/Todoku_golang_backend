@@ -71,6 +71,39 @@ func (r *Repository) ListByPostID(ctx context.Context, postID int64, limit, offs
 	return comments, nil
 }
 
+func (r *Repository) ListByUserID(ctx context.Context, userID int64, limit, offset int) ([]Comment, error) {
+	const query = `
+		SELECT comments.id, comments.post_id, comments.user_id, users.name,
+		       comments.comment, comments.created_at
+		FROM comments
+		JOIN users ON users.id = comments.user_id
+		WHERE comments.user_id = $1
+		ORDER BY comments.created_at DESC, comments.id DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list user comments: %w", err)
+	}
+	defer rows.Close()
+
+	comments := make([]Comment, 0)
+	for rows.Next() {
+		var item Comment
+		if err := rows.Scan(
+			&item.ID, &item.PostID, &item.UserID, &item.Name,
+			&item.Comment, &item.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan user comment: %w", err)
+		}
+		comments = append(comments, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate user comments: %w", err)
+	}
+	return comments, nil
+}
+
 func (r *Repository) PostExists(ctx context.Context, postID int64) (bool, error) {
 	const query = `SELECT EXISTS(SELECT 1 FROM posts WHERE id = $1)`
 	var exists bool
