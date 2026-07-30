@@ -32,16 +32,23 @@ func (r *Repository) Create(ctx context.Context, userID int64, doc string, image
 	return created, nil
 }
 
-func (r *Repository) List(ctx context.Context, limit, offset int) ([]Post, error) {
+func (r *Repository) List(ctx context.Context, viewerID int64, limit, offset int) ([]Post, error) {
 	const query = `
 		SELECT posts.id, posts.user_id, users.name, posts.doc,
-		       posts.image_url, posts.created_at
+		       posts.image_url, posts.created_at, COUNT(retweets.id),
+		       EXISTS (
+		           SELECT 1 FROM retweets viewer_retweets
+		           WHERE viewer_retweets.post_id = posts.id
+		             AND viewer_retweets.user_id = $1
+		       )
 		FROM posts
 		JOIN users ON users.id = posts.user_id
+		LEFT JOIN retweets ON retweets.post_id = posts.id
+		GROUP BY posts.id, users.name
 		ORDER BY posts.created_at DESC, posts.id DESC
-		LIMIT $1 OFFSET $2`
+		LIMIT $2 OFFSET $3`
 
-	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	rows, err := r.db.QueryContext(ctx, query, viewerID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list posts: %w", err)
 	}
@@ -52,7 +59,8 @@ func (r *Repository) List(ctx context.Context, limit, offset int) ([]Post, error
 		var item Post
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Name, &item.Doc,
-			&item.ImageURL, &item.CreatedAt,
+			&item.ImageURL, &item.CreatedAt, &item.RetweetCount,
+			&item.RetweetedByMe,
 		); err != nil {
 			return nil, fmt.Errorf("scan post: %w", err)
 		}
@@ -65,13 +73,22 @@ func (r *Repository) List(ctx context.Context, limit, offset int) ([]Post, error
 	return posts, nil
 }
 
-func (r *Repository) ListByUserName(ctx context.Context, name string, limit, offset int) ([]Post, error) {
+func (r *Repository) ListByUserName(ctx context.Context, viewerID int64, name string, limit, offset int) ([]Post, error) {
 	const query = `
-		SELECT posts.id, posts.user_id, users.name, posts.doc, posts.image_url, posts.created_at
-		FROM posts JOIN users ON users.id = posts.user_id
-		WHERE users.name = $1
-		ORDER BY posts.created_at DESC, posts.id DESC LIMIT $2 OFFSET $3`
-	rows, err := r.db.QueryContext(ctx, query, name, limit, offset)
+		SELECT posts.id, posts.user_id, users.name, posts.doc, posts.image_url,
+		       posts.created_at, COUNT(retweets.id),
+		       EXISTS (
+		           SELECT 1 FROM retweets viewer_retweets
+		           WHERE viewer_retweets.post_id = posts.id
+		             AND viewer_retweets.user_id = $1
+		       )
+		FROM posts
+		JOIN users ON users.id = posts.user_id
+		LEFT JOIN retweets ON retweets.post_id = posts.id
+		WHERE users.name = $2
+		GROUP BY posts.id, users.name
+		ORDER BY posts.created_at DESC, posts.id DESC LIMIT $3 OFFSET $4`
+	rows, err := r.db.QueryContext(ctx, query, viewerID, name, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list user posts: %w", err)
 	}
@@ -79,7 +96,10 @@ func (r *Repository) ListByUserName(ctx context.Context, name string, limit, off
 	posts := make([]Post, 0)
 	for rows.Next() {
 		var item Post
-		if err := rows.Scan(&item.ID, &item.UserID, &item.Name, &item.Doc, &item.ImageURL, &item.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.Name, &item.Doc, &item.ImageURL,
+			&item.CreatedAt, &item.RetweetCount, &item.RetweetedByMe,
+		); err != nil {
 			return nil, fmt.Errorf("scan user post: %w", err)
 		}
 		posts = append(posts, item)
@@ -90,18 +110,26 @@ func (r *Repository) ListByUserName(ctx context.Context, name string, limit, off
 	return posts, nil
 }
 
-func (r *Repository) FindByID(ctx context.Context, postID int64) (Post, error) {
+func (r *Repository) FindByID(ctx context.Context, postID, viewerID int64) (Post, error) {
 	const query = `
 		SELECT posts.id, posts.user_id, users.name, posts.doc,
-		       posts.image_url, posts.created_at
+		       posts.image_url, posts.created_at, COUNT(retweets.id),
+		       EXISTS (
+		           SELECT 1 FROM retweets viewer_retweets
+		           WHERE viewer_retweets.post_id = posts.id
+		             AND viewer_retweets.user_id = $2
+		       )
 		FROM posts
 		JOIN users ON users.id = posts.user_id
-		WHERE posts.id = $1`
+		LEFT JOIN retweets ON retweets.post_id = posts.id
+		WHERE posts.id = $1
+		GROUP BY posts.id, users.name`
 
 	var found Post
-	err := r.db.QueryRowContext(ctx, query, postID).Scan(
+	err := r.db.QueryRowContext(ctx, query, postID, viewerID).Scan(
 		&found.ID, &found.UserID, &found.Name, &found.Doc,
-		&found.ImageURL, &found.CreatedAt,
+		&found.ImageURL, &found.CreatedAt, &found.RetweetCount,
+		&found.RetweetedByMe,
 	)
 	if err != nil {
 		return Post{}, fmt.Errorf("find post by id: %w", err)
@@ -109,6 +137,110 @@ func (r *Repository) FindByID(ctx context.Context, postID int64) (Post, error) {
 
 	return found, nil
 }
+
+func (r *Repository) Retweet(ctx context.Context, postID, userID int64) (RetweetResponse, error) {
+	const query = `
+		WITH inserted AS (
+			INSERT INTO retweets (post_id, user_id)
+			VALUES ($1, $2)
+			ON CONFLICT (post_id, user_id) DO NOTHING
+			RETURNING id
+		)
+		SELECT
+			(SELECT COUNT(*) FROM retweets WHERE post_id = $1)
+			    + (SELECT COUNT(*) FROM inserted),
+			EXISTS(SELECT 1 FROM inserted)`
+
+	var response RetweetResponse
+	var created bool
+	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
+		&response.RetweetCount, &created,
+	); err != nil {
+		return RetweetResponse{}, fmt.Errorf("retweet post: %w", err)
+	}
+	response.RetweetedByMe = true
+	if !created {
+		return response, ErrAlreadyRetweeted
+	}
+	return response, nil
+}
+
+func (r *Repository) UndoRetweet(ctx context.Context, postID, userID int64) (RetweetResponse, error) {
+	const query = `
+		WITH deleted AS (
+			DELETE FROM retweets
+			WHERE post_id = $1 AND user_id = $2
+			RETURNING id
+		)
+		SELECT
+			GREATEST(
+				(SELECT COUNT(*) FROM retweets WHERE post_id = $1)
+				    - (SELECT COUNT(*) FROM deleted),
+				0
+			),
+			EXISTS(SELECT 1 FROM deleted)`
+
+	var response RetweetResponse
+	var deleted bool
+	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
+		&response.RetweetCount, &deleted,
+	); err != nil {
+		return RetweetResponse{}, fmt.Errorf("undo retweet: %w", err)
+	}
+	if !deleted {
+		return response, ErrNotRetweeted
+	}
+	return response, nil
+}
+
+func (r *Repository) ListRetweetedByUser(ctx context.Context, userID int64, limit, offset int) ([]Post, error) {
+	const query = `
+		SELECT posts.id, posts.user_id, users.name, posts.doc,
+		       posts.image_url, posts.created_at, COUNT(all_retweets.id), TRUE
+		FROM retweets my_retweets
+		JOIN posts ON posts.id = my_retweets.post_id
+		JOIN users ON users.id = posts.user_id
+		LEFT JOIN retweets all_retweets ON all_retweets.post_id = posts.id
+		WHERE my_retweets.user_id = $1
+		GROUP BY posts.id, users.name, my_retweets.created_at
+		ORDER BY my_retweets.created_at DESC, posts.id DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list retweeted posts: %w", err)
+	}
+	defer rows.Close()
+
+	posts := make([]Post, 0)
+	for rows.Next() {
+		var item Post
+		if err := rows.Scan(
+			&item.ID, &item.UserID, &item.Name, &item.Doc,
+			&item.ImageURL, &item.CreatedAt, &item.RetweetCount,
+			&item.RetweetedByMe,
+		); err != nil {
+			return nil, fmt.Errorf("scan retweeted post: %w", err)
+		}
+		posts = append(posts, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate retweeted posts: %w", err)
+	}
+	return posts, nil
+}
+
+func (r *Repository) PostExists(ctx context.Context, postID int64) (bool, error) {
+	const query = `SELECT EXISTS(SELECT 1 FROM posts WHERE id = $1)`
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, query, postID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check post existence: %w", err)
+	}
+	return exists, nil
+}
+
+var ErrAlreadyRetweeted = errors.New("post already retweeted")
+var ErrNotRetweeted = errors.New("post is not retweeted")
 
 func (r *Repository) Delete(ctx context.Context, postID, userID int64) (*string, error) {
 	const query = `
