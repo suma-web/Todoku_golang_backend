@@ -242,6 +242,68 @@ func (h *Handler) ListMyRetweets(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) Like(w http.ResponseWriter, r *http.Request) {
+	postID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || postID <= 0 {
+		writeError(w, http.StatusBadRequest, "INVALID_POST_ID", "投稿IDが不正です")
+		return
+	}
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	exists, err := h.repository.PostExists(ctx, postID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "いいねできませんでした")
+		return
+	}
+	if !exists {
+		writeError(w, http.StatusNotFound, "POST_NOT_FOUND", "投稿が見つかりません")
+		return
+	}
+
+	response, err := h.repository.Like(ctx, postID, userID)
+	if err != nil {
+		if errors.Is(err, ErrAlreadyLiked) {
+			writeError(w, http.StatusConflict, "ALREADY_LIKED", "この投稿はいいね済みです")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "いいねできませんでした")
+		return
+	}
+	writeJSON(w, http.StatusCreated, response)
+}
+
+func (h *Handler) UndoLike(w http.ResponseWriter, r *http.Request) {
+	postID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || postID <= 0 {
+		writeError(w, http.StatusBadRequest, "INVALID_POST_ID", "投稿IDが不正です")
+		return
+	}
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	response, err := h.repository.UndoLike(ctx, postID, userID)
+	if err != nil {
+		if errors.Is(err, ErrNotLiked) {
+			writeError(w, http.StatusNotFound, "LIKE_NOT_FOUND", "この投稿はいいねされていません")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "いいねを解除できませんでした")
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	postID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || postID <= 0 {
