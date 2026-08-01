@@ -40,6 +40,12 @@ func (r *Repository) List(ctx context.Context, viewerID int64, limit, offset int
 		           SELECT 1 FROM retweets viewer_retweets
 		           WHERE viewer_retweets.post_id = posts.id
 		             AND viewer_retweets.user_id = $1
+		       ),
+		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
+		       EXISTS (
+		           SELECT 1 FROM likes viewer_likes
+		           WHERE viewer_likes.post_id = posts.id
+		             AND viewer_likes.user_id = $1
 		       )
 		FROM posts
 		JOIN users ON users.id = posts.user_id
@@ -60,7 +66,7 @@ func (r *Repository) List(ctx context.Context, viewerID int64, limit, offset int
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Name, &item.Doc,
 			&item.ImageURL, &item.CreatedAt, &item.RetweetCount,
-			&item.RetweetedByMe,
+			&item.RetweetedByMe, &item.LikeCount, &item.LikedByMe,
 		); err != nil {
 			return nil, fmt.Errorf("scan post: %w", err)
 		}
@@ -81,6 +87,12 @@ func (r *Repository) ListByUserName(ctx context.Context, viewerID int64, name st
 		           SELECT 1 FROM retweets viewer_retweets
 		           WHERE viewer_retweets.post_id = posts.id
 		             AND viewer_retweets.user_id = $1
+		       ),
+		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
+		       EXISTS (
+		           SELECT 1 FROM likes viewer_likes
+		           WHERE viewer_likes.post_id = posts.id
+		             AND viewer_likes.user_id = $1
 		       )
 		FROM posts
 		JOIN users ON users.id = posts.user_id
@@ -99,6 +111,7 @@ func (r *Repository) ListByUserName(ctx context.Context, viewerID int64, name st
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Name, &item.Doc, &item.ImageURL,
 			&item.CreatedAt, &item.RetweetCount, &item.RetweetedByMe,
+			&item.LikeCount, &item.LikedByMe,
 		); err != nil {
 			return nil, fmt.Errorf("scan user post: %w", err)
 		}
@@ -118,6 +131,12 @@ func (r *Repository) FindByID(ctx context.Context, postID, viewerID int64) (Post
 		           SELECT 1 FROM retweets viewer_retweets
 		           WHERE viewer_retweets.post_id = posts.id
 		             AND viewer_retweets.user_id = $2
+		       ),
+		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
+		       EXISTS (
+		           SELECT 1 FROM likes viewer_likes
+		           WHERE viewer_likes.post_id = posts.id
+		             AND viewer_likes.user_id = $2
 		       )
 		FROM posts
 		JOIN users ON users.id = posts.user_id
@@ -129,7 +148,7 @@ func (r *Repository) FindByID(ctx context.Context, postID, viewerID int64) (Post
 	err := r.db.QueryRowContext(ctx, query, postID, viewerID).Scan(
 		&found.ID, &found.UserID, &found.Name, &found.Doc,
 		&found.ImageURL, &found.CreatedAt, &found.RetweetCount,
-		&found.RetweetedByMe,
+		&found.RetweetedByMe, &found.LikeCount, &found.LikedByMe,
 	)
 	if err != nil {
 		return Post{}, fmt.Errorf("find post by id: %w", err)
@@ -196,7 +215,13 @@ func (r *Repository) UndoRetweet(ctx context.Context, postID, userID int64) (Ret
 func (r *Repository) ListRetweetedByUser(ctx context.Context, userID int64, limit, offset int) ([]Post, error) {
 	const query = `
 		SELECT posts.id, posts.user_id, users.name, posts.doc,
-		       posts.image_url, posts.created_at, COUNT(all_retweets.id), TRUE
+		       posts.image_url, posts.created_at, COUNT(all_retweets.id), TRUE,
+		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
+		       EXISTS (
+		           SELECT 1 FROM likes viewer_likes
+		           WHERE viewer_likes.post_id = posts.id
+		             AND viewer_likes.user_id = $1
+		       )
 		FROM retweets my_retweets
 		JOIN posts ON posts.id = my_retweets.post_id
 		JOIN users ON users.id = posts.user_id
@@ -218,7 +243,7 @@ func (r *Repository) ListRetweetedByUser(ctx context.Context, userID int64, limi
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Name, &item.Doc,
 			&item.ImageURL, &item.CreatedAt, &item.RetweetCount,
-			&item.RetweetedByMe,
+			&item.RetweetedByMe, &item.LikeCount, &item.LikedByMe,
 		); err != nil {
 			return nil, fmt.Errorf("scan retweeted post: %w", err)
 		}
@@ -228,6 +253,61 @@ func (r *Repository) ListRetweetedByUser(ctx context.Context, userID int64, limi
 		return nil, fmt.Errorf("iterate retweeted posts: %w", err)
 	}
 	return posts, nil
+}
+
+func (r *Repository) Like(ctx context.Context, postID, userID int64) (LikeResponse, error) {
+	const query = `
+		WITH inserted AS (
+			INSERT INTO likes (post_id, user_id)
+			VALUES ($1, $2)
+			ON CONFLICT (post_id, user_id) DO NOTHING
+			RETURNING id
+		)
+		SELECT
+			(SELECT COUNT(*) FROM likes WHERE post_id = $1)
+			    + (SELECT COUNT(*) FROM inserted),
+			EXISTS(SELECT 1 FROM inserted)`
+
+	var response LikeResponse
+	var created bool
+	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
+		&response.LikeCount, &created,
+	); err != nil {
+		return LikeResponse{}, fmt.Errorf("like post: %w", err)
+	}
+	response.LikedByMe = true
+	if !created {
+		return response, ErrAlreadyLiked
+	}
+	return response, nil
+}
+
+func (r *Repository) UndoLike(ctx context.Context, postID, userID int64) (LikeResponse, error) {
+	const query = `
+		WITH deleted AS (
+			DELETE FROM likes
+			WHERE post_id = $1 AND user_id = $2
+			RETURNING id
+		)
+		SELECT
+			GREATEST(
+				(SELECT COUNT(*) FROM likes WHERE post_id = $1)
+				    - (SELECT COUNT(*) FROM deleted),
+				0
+			),
+			EXISTS(SELECT 1 FROM deleted)`
+
+	var response LikeResponse
+	var deleted bool
+	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
+		&response.LikeCount, &deleted,
+	); err != nil {
+		return LikeResponse{}, fmt.Errorf("undo like: %w", err)
+	}
+	if !deleted {
+		return response, ErrNotLiked
+	}
+	return response, nil
 }
 
 func (r *Repository) PostExists(ctx context.Context, postID int64) (bool, error) {
@@ -241,6 +321,8 @@ func (r *Repository) PostExists(ctx context.Context, postID int64) (bool, error)
 
 var ErrAlreadyRetweeted = errors.New("post already retweeted")
 var ErrNotRetweeted = errors.New("post is not retweeted")
+var ErrAlreadyLiked = errors.New("post already liked")
+var ErrNotLiked = errors.New("post is not liked")
 
 func (r *Repository) Delete(ctx context.Context, postID, userID int64) (*string, error) {
 	const query = `

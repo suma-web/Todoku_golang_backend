@@ -83,6 +83,8 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me/retweets", postHandler.ListMyRetweets)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/retweets", postHandler.Retweet)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}/retweets", postHandler.UndoRetweet)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/likes", postHandler.Like)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}/likes", postHandler.UndoLike)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me/comments", commentHandler.ListMine)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}/comments", commentHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/comments", commentHandler.Create)
