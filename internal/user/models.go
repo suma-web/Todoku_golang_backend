@@ -45,12 +45,17 @@ type LoginResponse struct {
 }
 
 type CurrentUserResponse struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Bio       string `json:"bio"`
-	Location  string `json:"location"`
-	Website   string `json:"website"`
-	CreatedAt string `json:"created_at"`
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	Bio          string `json:"bio"`
+	Location     string `json:"location"`
+	Website      string `json:"website"`
+	CreatedAt    string `json:"created_at"`
+	FollowedByMe bool   `json:"followed_by_me"`
+}
+
+type FollowResponse struct {
+	FollowedByMe bool `json:"followed_by_me"`
 }
 
 type UpdateProfileRequest struct {
