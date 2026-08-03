@@ -76,6 +76,8 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me", userHandler.Me)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/users/{name}/follow", userHandler.Follow)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/users/{name}/follow", userHandler.Unfollow)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts", postHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}", postHandler.Get)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}", postHandler.Delete)
