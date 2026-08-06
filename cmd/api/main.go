@@ -13,6 +13,7 @@ import (
 	"twitter_golang_backend/internal/comment"
 	"twitter_golang_backend/internal/config"
 	"twitter_golang_backend/internal/database"
+	"twitter_golang_backend/internal/notification"
 	"twitter_golang_backend/internal/post"
 	"twitter_golang_backend/internal/user"
 )
@@ -35,6 +36,8 @@ func main() {
 	postHandler := post.NewHandler(postRepository, "uploads")
 	commentRepository := comment.NewRepository(db)
 	commentHandler := comment.NewHandler(commentRepository)
+	notificationRepository := notification.NewRepository(db)
+	notificationHandler := notification.NewHandler(notificationRepository)
 
 	router := chi.NewRouter()
 
@@ -91,6 +94,7 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}/comments", commentHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/comments", commentHandler.Create)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/comments/{id}", commentHandler.Delete)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/notifications", notificationHandler.List)
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	server := &http.Server{
