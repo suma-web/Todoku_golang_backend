@@ -13,6 +13,7 @@ import (
 	"twitter_golang_backend/internal/comment"
 	"twitter_golang_backend/internal/config"
 	"twitter_golang_backend/internal/database"
+	"twitter_golang_backend/internal/message"
 	"twitter_golang_backend/internal/notification"
 	"twitter_golang_backend/internal/post"
 	"twitter_golang_backend/internal/user"
@@ -38,6 +39,8 @@ func main() {
 	commentHandler := comment.NewHandler(commentRepository)
 	notificationRepository := notification.NewRepository(db)
 	notificationHandler := notification.NewHandler(notificationRepository)
+	messageRepository := message.NewRepository(db)
+	messageHandler := message.NewHandler(messageRepository)
 
 	router := chi.NewRouter()
 
@@ -95,6 +98,11 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/comments", commentHandler.Create)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/comments/{id}", commentHandler.Delete)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/notifications", notificationHandler.List)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/groups", messageHandler.CreateGroup)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/groups", messageHandler.ListGroups)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/groups/{id}", messageHandler.GetGroup)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/groups/{id}/messages", messageHandler.CreateMessage)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/groups/{id}/messages", messageHandler.ListMessages)
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	server := &http.Server{
