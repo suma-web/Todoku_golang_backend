@@ -170,3 +170,18 @@ func (r *Repository) Unfollow(ctx context.Context, followerID, followedID int64)
 	}
 	return nil
 }
+
+func (r *Repository) Delete(ctx context.Context, userID int64) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count deleted users: %w", err)
+	}
+	if deleted == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}

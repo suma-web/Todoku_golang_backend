@@ -191,6 +191,31 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	auth.ClearSessionCookie(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserID(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := h.repository.Delete(ctx, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "USER_NOT_FOUND", "ユーザーが見つかりません")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "退会できませんでした")
+		return
+	}
+	auth.ClearSessionCookie(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserID(r.Context())
 	if !ok {
