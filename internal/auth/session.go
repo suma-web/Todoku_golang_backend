@@ -24,6 +24,13 @@ func SetSessionCookie(w http.ResponseWriter, userID int64, secret string) {
 	})
 }
 
+func ClearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name: cookieName, Value: "", Path: "/", HttpOnly: true,
+		SameSite: http.SameSiteLaxMode, MaxAge: -1, Expires: time.Unix(0, 0),
+	})
+}
+
 func RequireAuth(secret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
