@@ -57,7 +57,7 @@ func (r *Repository) FindByLoginIdentifier(
 	identifier string,
 ) (User, error) {
 	const query = `
-		SELECT id, name, email, birthday, password_hash, created_at
+			SELECT id, name, email, birthday, password_hash, created_at, role, is_active
 		FROM users
 		WHERE LOWER(email) = LOWER($1) OR name = $1
 		ORDER BY id
@@ -73,6 +73,8 @@ func (r *Repository) FindByLoginIdentifier(
 		&foundUser.Birthday,
 		&foundUser.PasswordHash,
 		&foundUser.CreatedAt,
+		&foundUser.Role,
+		&foundUser.IsActive,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -87,7 +89,7 @@ func (r *Repository) FindByLoginIdentifier(
 
 func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
 	const query = `
-		SELECT id, name, email, birthday, created_at, bio, location, website
+			SELECT id, name, email, birthday, created_at, bio, location, website, role, is_active
 		FROM users
 		WHERE id = $1
 	`
@@ -102,12 +104,25 @@ func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
 		&foundUser.Bio,
 		&foundUser.Location,
 		&foundUser.Website,
+		&foundUser.Role,
+		&foundUser.IsActive,
 	)
 	if err != nil {
 		return User{}, fmt.Errorf("find user by id: %w", err)
 	}
 
 	return foundUser, nil
+}
+
+func (r *Repository) CreateSchoolUser(ctx context.Context, name, email, passwordHash, role string) (User, error) {
+	const query = `INSERT INTO users (name,email,birthday,password_hash,role)
+		VALUES ($1,$2,DATE '2000-01-01',$3,$4)
+		RETURNING id,name,email,birthday,created_at,role,is_active`
+	var created User
+	err := r.db.QueryRowContext(ctx, query, name, email, passwordHash, role).Scan(
+		&created.ID, &created.Name, &created.Email, &created.Birthday,
+		&created.CreatedAt, &created.Role, &created.IsActive)
+	return created, err
 }
 
 func (r *Repository) FindByName(ctx context.Context, name string) (User, error) {

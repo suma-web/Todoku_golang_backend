@@ -1,0 +1,5 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'student';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_valid;
+ALTER TABLE users ADD CONSTRAINT users_role_valid CHECK (role IN ('student', 'teacher', 'admin'));
+
