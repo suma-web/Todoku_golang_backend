@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS school_post_statuses(post_id BIGINT REFERENCES school_posts(id) ON DELETE CASCADE,user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,read_at TIMESTAMPTZ,confirmed_at TIMESTAMPTZ,PRIMARY KEY(post_id,user_id));
