@@ -105,3 +105,27 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(204)
 }
+
+func (h *Handler) Timeline(w http.ResponseWriter, r *http.Request) {
+	uid, _ := auth.UserID(r.Context())
+	rows, err := h.db.QueryContext(r.Context(), `SELECT DISTINCT p.id,p.author_id,u.name,p.type,p.title,p.content,p.priority,p.expires_at,p.created_at
+		FROM school_posts p JOIN users u ON u.id=p.author_id JOIN school_post_groups pg ON pg.post_id=p.id
+		JOIN user_school_groups ug ON ug.group_id=pg.group_id
+		WHERE ug.user_id=$1 AND (p.expires_at IS NULL OR p.expires_at>=NOW())
+		ORDER BY CASE p.priority WHEN 'urgent' THEN 1 WHEN 'important' THEN 2 ELSE 3 END,p.created_at DESC LIMIT 100`, uid)
+	if err != nil {
+		bad(w, 500, "タイムラインを取得できませんでした")
+		return
+	}
+	defer rows.Close()
+	items := []Post{}
+	for rows.Next() {
+		var p Post
+		if rows.Scan(&p.ID, &p.AuthorID, &p.AuthorName, &p.Type, &p.Title, &p.Content, &p.Priority, &p.ExpiresAt, &p.CreatedAt) != nil {
+			bad(w, 500, "タイムラインを取得できませんでした")
+			return
+		}
+		items = append(items, p)
+	}
+	out(w, 200, items)
+}
