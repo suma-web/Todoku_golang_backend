@@ -169,6 +169,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+	if !foundUser.IsActive {
+		writeError(w, http.StatusForbidden, "ACCOUNT_DISABLED", "このアカウントは無効です")
+		return
+	}
 
 	if err := bcrypt.CompareHashAndPassword(
 		[]byte(foundUser.PasswordHash),
@@ -186,6 +190,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Email:     foundUser.Email,
 		Birthday:  foundUser.Birthday.Format("2006-01-02"),
 		CreatedAt: foundUser.CreatedAt.Format(time.RFC3339),
+		Role:      foundUser.Role,
 	}
 
 	writeJSON(w, http.StatusOK, response)
@@ -241,7 +246,43 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		ID: foundUser.ID, Name: foundUser.Name, Bio: foundUser.Bio,
 		Location: foundUser.Location, Website: foundUser.Website,
 		CreatedAt: foundUser.CreatedAt.Format(time.RFC3339),
+		Role:      foundUser.Role, IsActive: foundUser.IsActive,
 	})
+}
+
+func (h *Handler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
+	var request AdminCreateUserRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&request) != nil {
+		writeError(w, 400, "INVALID_JSON", "入力が不正です")
+		return
+	}
+	request.Name = strings.TrimSpace(request.Name)
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+	if request.Name == "" || len(request.Password) < 8 || (request.Role != "student" && request.Role != "teacher" && request.Role != "admin") {
+		writeError(w, 400, "VALIDATION_ERROR", "名前、8文字以上のパスワード、正しいRoleを指定してください")
+		return
+	}
+	if _, err := mail.ParseAddress(request.Email); err != nil {
+		writeError(w, 400, "VALIDATION_ERROR", "メールアドレスが不正です")
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, 500, "INTERNAL_ERROR", "ユーザーを作成できませんでした")
+		return
+	}
+	created, err := h.repository.CreateSchoolUser(r.Context(), request.Name, request.Email, string(hash), request.Role)
+	if err != nil {
+		if isUniqueViolation(err) {
+			writeError(w, 409, "EMAIL_ALREADY_EXISTS", "登録済みのメールアドレスです")
+			return
+		}
+		writeError(w, 500, "INTERNAL_ERROR", "ユーザーを作成できませんでした")
+		return
+	}
+	writeJSON(w, http.StatusCreated, CurrentUserResponse{ID: created.ID, Name: created.Name, Role: created.Role, IsActive: created.IsActive, CreatedAt: created.CreatedAt.Format(time.RFC3339)})
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {

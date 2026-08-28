@@ -81,6 +81,7 @@ func main() {
 	router.Post("/api/login", userHandler.Login)
 	router.Post("/api/logout", userHandler.Logout)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me", userHandler.Me)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Post("/api/admin/users", userHandler.AdminCreateUser)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)

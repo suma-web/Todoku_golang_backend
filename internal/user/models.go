@@ -26,6 +26,8 @@ type User struct {
 	Bio          string    `json:"bio"`
 	Location     string    `json:"location"`
 	Website      string    `json:"website"`
+	Role         string    `json:"role"`
+	IsActive     bool      `json:"is_active"`
 }
 
 type SignupResponse struct {
@@ -42,6 +44,7 @@ type LoginResponse struct {
 	Email     string `json:"email"`
 	Birthday  string `json:"birthday"`
 	CreatedAt string `json:"created_at"`
+	Role      string `json:"role"`
 }
 
 type CurrentUserResponse struct {
@@ -52,6 +55,15 @@ type CurrentUserResponse struct {
 	Website      string `json:"website"`
 	CreatedAt    string `json:"created_at"`
 	FollowedByMe bool   `json:"followed_by_me"`
+	Role         string `json:"role"`
+	IsActive     bool   `json:"is_active"`
+}
+
+type AdminCreateUserRequest struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
 }
 
 type FollowResponse struct {

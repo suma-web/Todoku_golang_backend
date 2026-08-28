@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"net/http"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 const cookieName = "session"
 
 type userIDKey struct{}
+type roleKey struct{}
 
 func SetSessionCookie(w http.ResponseWriter, userID int64, secret string) {
 	payload := strconv.FormatInt(userID, 10)
@@ -63,6 +65,33 @@ func writeUnauthorized(w http.ResponseWriter, message string) {
 func UserID(ctx context.Context) (int64, bool) {
 	id, ok := ctx.Value(userIDKey{}).(int64)
 	return id, ok
+}
+
+func RequireRole(db *sql.DB, roles ...string) func(http.Handler) http.Handler {
+	allowed := map[string]bool{}
+	for _, role := range roles {
+		allowed[role] = true
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			id, ok := UserID(r.Context())
+			if !ok {
+				writeUnauthorized(w, "ログインが必要です")
+				return
+			}
+			var role string
+			var active bool
+			if err := db.QueryRowContext(r.Context(), `SELECT role,is_active FROM users WHERE id=$1`, id).Scan(&role, &active); err != nil || !active {
+				writeUnauthorized(w, "アカウントが無効です")
+				return
+			}
+			if !allowed[role] {
+				http.Error(w, `{"error":{"code":"FORBIDDEN","message":"権限がありません"}}`, http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), roleKey{}, role)))
+		})
+	}
 }
 
 func sign(payload, secret string) string {
