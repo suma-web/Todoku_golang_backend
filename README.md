@@ -1,85 +1,122 @@
-# Twitter Clone Backend
+# 学校内情報・コミュニケーション基盤 Backend
 
-Twitter風アプリケーションのバックエンドAPIです。Goで構築し、ユーザー情報をPostgreSQLへ保存します。
+学校内に分散している連絡・質問・相談を一つに集約し、必要な情報へアクセスしやすくするためのWebアプリケーションのバックエンドAPIです。
 
-現在は新規登録APIとヘルスチェックAPIを実装しています。パスワードはbcryptでハッシュ化してから保存します。
+## 開発の背景
+
+最初はTwitterクローンとして技術学習目的で開発していました。しかし、自身の教育現場での経験から「情報が複数の場所に分散している」「質問したいときに適切な教員が分からない」という課題に着目し、既存サービスを調査したうえで、学校内情報基盤として要件を再設計しました。
+
+Twitterクローンとして実装した認証、投稿、コメント、通知などの技術要素を活かしながら、学校内での情報共有とコミュニケーションに必要な機能を追加しています。
+
+## 解決したい課題
+
+- Classroom、メール、口頭など、情報経路が複数の場所に分散している
+- 生徒が誰に質問すべきか分からない
+- 担当教員が不在のときに質問・相談が止まってしまう
+- 配信した連絡が対象者に読まれ、確認されたか分からない
+
+## 解決方法
+
+- **所属別情報配信**：学年、クラス、部活動、委員会、部署単位で対象者へ連絡を配信
+- **質問の担当部署ルーティング**：質問カテゴリを担当部署と紐付け、適切な窓口へ届ける
+- **公開質問 / 個別相談**：内容に応じて公開範囲を選択
+- **既読・確認**：閲覧状況と明示的な確認状況を記録
+- **横断検索**：閲覧権限を考慮し、お知らせ、質問・回答、担当窓口をまとめて検索
+
+## 主な機能
+
+- セッションCookieを用いた認証
+- 生徒・教員・管理者のRoleベースアクセス制御
+- 学年、クラス、部活動、委員会、部署の所属管理
+- 所属を対象にした学校連絡の作成・配信
+- 連絡の既読・確認状況、未確認者の取得
+- 質問カテゴリと担当部署の管理
+- 公開質問、個別相談、回答、解決状態の管理
+- 権限を考慮した学校内横断検索
+- 管理者によるユーザーRole・有効状態の管理
+- Twitterクローンとして開発した投稿、コメント、フォロー、通知、メッセージ機能
+
+## Role
+
+| Role | 主な権限 |
+| --- | --- |
+| `student` | 連絡の閲覧・確認、質問・相談、検索 |
+| `teacher` | 生徒の機能に加え、連絡作成、確認状況の閲覧、質問への回答 |
+| `admin` | 教員の機能に加え、ユーザー、所属、質問カテゴリの管理 |
 
 ## 使用技術
 
 - Go 1.25
+- chi
 - PostgreSQL 16
+- bcrypt
 - Docker / Docker Compose
 
-## Dockerで起動する
+## セットアップ
 
-PostgreSQLとGo APIをまとめて起動します。
+PostgreSQLとGo APIを起動します。
 
 ```bash
 docker compose up --build
 ```
 
-起動するサービスは以下の通りです。
-
 | サービス | URL・ポート |
 | --- | --- |
 | Go API | `http://localhost:8080` |
+| ヘルスチェック | `http://localhost:8080/health` |
 | PostgreSQL | `localhost:5432` |
 
-## データベース設定
+起動時に`migrations/`内のSQLが順番に適用されます。
 
-Docker Composeの開発用設定は以下です。
+### 開発用データベース設定
 
 | 項目 | 値 |
 | --- | --- |
-| Host | ローカルからは `localhost`、Docker内からは `postgres` |
+| Host | ローカル：`localhost` / Docker内：`postgres` |
 | Port | `5432` |
 | Database | `twitter` |
 | User | `twitter` |
 | Password | `twitter_password` |
 
-接続URL：
-
 ```text
 postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable
 ```
 
-初回起動時に `migrations/001_create_users.sql` が実行され、`users` テーブルが作成されます。
+## 主なAPI
 
-## 入力ルール
+| 分類 | エンドポイント例 |
+| --- | --- |
+| 認証 | `POST /api/signup`、`POST /api/login`、`GET /api/me` |
+| ユーザー管理 | `GET /api/admin/users`、`PATCH /api/admin/users/{id}` |
+| 所属管理 | `GET /api/school-groups`、`POST /api/school-groups` |
+| 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}` |
+| 既読・確認 | `POST /api/school-posts/{id}/read`、`POST /api/school-posts/{id}/confirm`、`GET /api/school-posts/{id}/status` |
+| 質問・相談 | `GET /api/questions`、`POST /api/questions`、`POST /api/questions/{id}/answers` |
+| 横断検索 | `GET /api/search?q={検索語}` |
 
-- 名前は必須、50文字以内
-- メールアドレスは有効な形式であること
-- メールアドレスは重複不可
-- 生年月日は `YYYY-MM-DD` 形式
-- パスワードは8文字以上
+学校機能APIは認証を必要とし、管理機能・教員機能にはRoleによるアクセス制御があります。
 
-## 動作確認
+## テスト
 
 ```bash
-curl -i -X POST http://localhost:8080/api/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "テストユーザー",
-    "email": "test@example.com",
-    "birthday": "2000-01-01",
-    "password": "password123"
-  }'
+go test ./...
 ```
 
 ## 主なディレクトリ構成
 
 ```text
 .
-├── cmd/api/main.go               # APIサーバーの起動とルーティング
+├── cmd/api/main.go          # APIサーバーとルーティング
 ├── internal/
-│   ├── config/config.go          # 環境変数の読み込み
-│   ├── database/database.go      # PostgreSQL接続
-│   └── user/
-│       ├── handler.go            # HTTPリクエストとレスポンス
-│       ├── models.go             # API・ユーザーの型定義
-│       └── repository.go         # ユーザーのDB操作
-├── migrations/
-│   └── 001_create_users.sql      # usersテーブル作成
+│   ├── auth/                # 認証・Role認可
+│   ├── database/            # PostgreSQL接続とマイグレーション
+│   ├── schooladmin/         # 管理者向けユーザー管理
+│   ├── schoolgroup/         # 所属管理
+│   ├── schoolpost/          # 学校連絡・既読・確認
+│   ├── question/            # 質問・相談
+│   ├── search/              # 権限を考慮した横断検索
+│   └── user/                # ユーザー・認証
+├── migrations/              # データベース定義
 ├── Dockerfile
 └── compose.yml
 ```
