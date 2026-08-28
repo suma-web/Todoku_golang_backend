@@ -16,6 +16,7 @@ import (
 	"twitter_golang_backend/internal/message"
 	"twitter_golang_backend/internal/notification"
 	"twitter_golang_backend/internal/post"
+	"twitter_golang_backend/internal/schoolgroup"
 	"twitter_golang_backend/internal/user"
 )
 
@@ -41,6 +42,7 @@ func main() {
 	notificationHandler := notification.NewHandler(notificationRepository)
 	messageRepository := message.NewRepository(db)
 	messageHandler := message.NewHandler(messageRepository)
+	schoolGroupHandler := schoolgroup.NewHandler(db)
 
 	router := chi.NewRouter()
 
@@ -82,6 +84,12 @@ func main() {
 	router.Post("/api/logout", userHandler.Logout)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me", userHandler.Me)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Post("/api/admin/users", userHandler.AdminCreateUser)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/school-groups", schoolGroupHandler.List)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{userId}/school-groups", schoolGroupHandler.UserGroups)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Post("/api/school-groups", schoolGroupHandler.Create)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Delete("/api/school-groups/{groupId}", schoolGroupHandler.Delete)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Post("/api/school-groups/{groupId}/members", schoolGroupHandler.AddMember)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Delete("/api/school-groups/{groupId}/members/{userId}", schoolGroupHandler.RemoveMember)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
