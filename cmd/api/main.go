@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -32,6 +33,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+
+	if err := database.Migrate(context.Background(), db, "migrations"); err != nil {
+		log.Fatal(err)
+	}
 
 	userRepository := user.NewRepository(db)
 	userHandler := user.NewHandler(userRepository, cfg.SessionSecret)
