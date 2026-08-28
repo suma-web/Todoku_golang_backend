@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -32,6 +33,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+
+	if err := database.Migrate(context.Background(), db, "migrations"); err != nil {
+		log.Fatal(err)
+	}
 
 	userRepository := user.NewRepository(db)
 	userHandler := user.NewHandler(userRepository, cfg.SessionSecret)
@@ -96,6 +101,10 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/school-posts/{id}", schoolPostHandler.Get)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/school-posts/{id}", schoolPostHandler.Delete)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/timeline", schoolPostHandler.Timeline)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/school-posts/{id}/read", schoolPostHandler.Read)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/school-posts/{id}/confirm", schoolPostHandler.Confirm)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Get("/api/school-posts/{id}/status", schoolPostHandler.Status)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Get("/api/school-posts/{id}/unconfirmed", schoolPostHandler.Unconfirmed)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)

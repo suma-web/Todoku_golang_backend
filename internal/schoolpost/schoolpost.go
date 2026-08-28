@@ -129,3 +129,65 @@ func (h *Handler) Timeline(w http.ResponseWriter, r *http.Request) {
 	}
 	out(w, 200, items)
 }
+
+func (h *Handler) Read(w http.ResponseWriter, r *http.Request)    { h.mark(w, r, false) }
+func (h *Handler) Confirm(w http.ResponseWriter, r *http.Request) { h.mark(w, r, true) }
+func (h *Handler) mark(w http.ResponseWriter, r *http.Request, confirm bool) {
+	pid, e := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if e != nil {
+		bad(w, 400, "IDが不正です")
+		return
+	}
+	uid, _ := auth.UserID(r.Context())
+	var targeted bool
+	e = h.db.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=$1 AND ug.user_id=$2)`, pid, uid).Scan(&targeted)
+	if e != nil || !targeted {
+		bad(w, 403, "この投稿の対象者ではありません")
+		return
+	}
+	if confirm {
+		_, e = h.db.ExecContext(r.Context(), `INSERT INTO school_post_statuses(post_id,user_id,read_at,confirmed_at)VALUES($1,$2,NOW(),NOW()) ON CONFLICT(post_id,user_id)DO UPDATE SET read_at=COALESCE(school_post_statuses.read_at,NOW()),confirmed_at=NOW()`, pid, uid)
+	} else {
+		_, e = h.db.ExecContext(r.Context(), `INSERT INTO school_post_statuses(post_id,user_id,read_at)VALUES($1,$2,NOW()) ON CONFLICT(post_id,user_id)DO UPDATE SET read_at=COALESCE(school_post_statuses.read_at,NOW())`, pid, uid)
+	}
+	if e != nil {
+		bad(w, 500, "確認状態を保存できませんでした")
+		return
+	}
+	w.WriteHeader(204)
+}
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
+	pid, e := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if e != nil {
+		bad(w, 400, "IDが不正です")
+		return
+	}
+	var target, read, confirmed int
+	e = h.db.QueryRowContext(r.Context(), `WITH targets AS(SELECT DISTINCT ug.user_id FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=$1) SELECT COUNT(*),COUNT(s.read_at),COUNT(s.confirmed_at) FROM targets t LEFT JOIN school_post_statuses s ON s.post_id=$1 AND s.user_id=t.user_id`, pid).Scan(&target, &read, &confirmed)
+	if e != nil {
+		bad(w, 500, "確認状況を取得できませんでした")
+		return
+	}
+	out(w, 200, map[string]int{"target_count": target, "read_count": read, "confirmed_count": confirmed, "unconfirmed_count": target - confirmed})
+}
+func (h *Handler) Unconfirmed(w http.ResponseWriter, r *http.Request) {
+	pid, e := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if e != nil {
+		bad(w, 400, "IDが不正です")
+		return
+	}
+	rows, e := h.db.QueryContext(r.Context(), `SELECT DISTINCT u.id,u.name FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id JOIN users u ON u.id=ug.user_id LEFT JOIN school_post_statuses s ON s.post_id=pg.post_id AND s.user_id=u.id WHERE pg.post_id=$1 AND s.confirmed_at IS NULL ORDER BY u.name`, pid)
+	if e != nil {
+		bad(w, 500, "未確認者を取得できませんでした")
+		return
+	}
+	defer rows.Close()
+	items := []map[string]any{}
+	for rows.Next() {
+		var id int64
+		var name string
+		_ = rows.Scan(&id, &name)
+		items = append(items, map[string]any{"id": id, "name": name})
+	}
+	out(w, 200, items)
+}
