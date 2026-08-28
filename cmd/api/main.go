@@ -20,6 +20,7 @@ import (
 	"twitter_golang_backend/internal/question"
 	"twitter_golang_backend/internal/schoolgroup"
 	"twitter_golang_backend/internal/schoolpost"
+	"twitter_golang_backend/internal/search"
 	"twitter_golang_backend/internal/user"
 )
 
@@ -52,6 +53,7 @@ func main() {
 	schoolGroupHandler := schoolgroup.NewHandler(db)
 	schoolPostHandler := schoolpost.NewHandler(db)
 	questionHandler := question.NewHandler(db)
+	searchHandler := search.NewHandler(db)
 
 	router := chi.NewRouter()
 
@@ -115,6 +117,7 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/questions/{id}/answers", questionHandler.ListAnswers)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/questions/{id}/answers", questionHandler.Answer)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/questions/{id}/resolve", questionHandler.Resolve)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/search", searchHandler.Search)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
