@@ -95,6 +95,7 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Post("/api/school-posts", schoolPostHandler.Create)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/school-posts/{id}", schoolPostHandler.Get)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/school-posts/{id}", schoolPostHandler.Delete)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/timeline", schoolPostHandler.Timeline)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
