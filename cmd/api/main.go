@@ -17,6 +17,7 @@ import (
 	"twitter_golang_backend/internal/message"
 	"twitter_golang_backend/internal/notification"
 	"twitter_golang_backend/internal/post"
+	"twitter_golang_backend/internal/question"
 	"twitter_golang_backend/internal/schoolgroup"
 	"twitter_golang_backend/internal/schoolpost"
 	"twitter_golang_backend/internal/user"
@@ -50,6 +51,7 @@ func main() {
 	messageHandler := message.NewHandler(messageRepository)
 	schoolGroupHandler := schoolgroup.NewHandler(db)
 	schoolPostHandler := schoolpost.NewHandler(db)
+	questionHandler := question.NewHandler(db)
 
 	router := chi.NewRouter()
 
@@ -105,6 +107,14 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/school-posts/{id}/confirm", schoolPostHandler.Confirm)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Get("/api/school-posts/{id}/status", schoolPostHandler.Status)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Get("/api/school-posts/{id}/unconfirmed", schoolPostHandler.Unconfirmed)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/question-categories", questionHandler.ListCategories)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Post("/api/question-categories", questionHandler.CreateCategory)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/questions", questionHandler.Create)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/questions", questionHandler.List)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/questions/{id}", questionHandler.Get)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/questions/{id}/answers", questionHandler.ListAnswers)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/questions/{id}/answers", questionHandler.Answer)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/questions/{id}/resolve", questionHandler.Resolve)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
