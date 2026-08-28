@@ -92,6 +92,29 @@ func (h *Handler) UserGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	respond(w, 200, items)
 }
+func (h *Handler) Members(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r, "groupId")
+	if err != nil {
+		fail(w, 400, "所属IDが不正です")
+		return
+	}
+	rows, err := h.db.QueryContext(r.Context(), `SELECT u.id,u.name,u.email,u.role FROM users u JOIN user_school_groups ug ON ug.user_id=u.id WHERE ug.group_id=$1 ORDER BY u.name`, id)
+	if err != nil {
+		fail(w, 500, "所属メンバーを取得できませんでした")
+		return
+	}
+	defer rows.Close()
+	items := []Member{}
+	for rows.Next() {
+		var item Member
+		if rows.Scan(&item.ID, &item.Name, &item.Email, &item.Role) != nil {
+			fail(w, 500, "所属メンバーを取得できませんでした")
+			return
+		}
+		items = append(items, item)
+	}
+	respond(w, 200, items)
+}
 func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 	groupID, err := idParam(r, "groupId")
 	if err != nil {
