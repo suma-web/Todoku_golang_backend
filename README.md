@@ -102,6 +102,23 @@ postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable
 go test ./...
 ```
 
+## 学校機能の責務分離
+
+`question`、`schoolpost`、`search`は、次の依存方向で構成しています。
+
+```text
+Handler → Service → Repository → PostgreSQL
+```
+
+| 層 | 責務 |
+| --- | --- |
+| Handler | HTTP入力の解析、認証コンテキストの取得、ステータスコードとJSONレスポンス |
+| Service | 入力値の正規化・検証、権限判定、処理手順などの業務ルール |
+| Repository | SQL、トランザクション、検索結果のマッピング |
+| Models | APIと各層で共有するデータ構造 |
+
+ServiceはRepositoryインターフェースへ依存するため、PostgreSQLを起動せず単体テストできます。
+
 ## 主なディレクトリ構成
 
 ```text
