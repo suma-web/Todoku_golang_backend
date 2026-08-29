@@ -52,13 +52,14 @@ func (s *Service) Timeline(ctx context.Context, userID int64) ([]Post, error) {
 	return s.repository.Timeline(ctx, userID)
 }
 
-func (s *Service) Mark(ctx context.Context, postID, userID int64, confirm bool) error {
+func (s *Service) Authored(ctx context.Context, userID int64) ([]Post, error) {
+	return s.repository.Authored(ctx, userID)
+}
+
+func (s *Service) MarkRead(ctx context.Context, postID, userID int64) error {
 	targeted, err := s.repository.IsTarget(ctx, postID, userID)
 	if err != nil || !targeted {
 		return ErrForbidden
-	}
-	if confirm {
-		return s.repository.MarkConfirmed(ctx, postID, userID)
 	}
 	return s.repository.MarkRead(ctx, postID, userID)
 }
@@ -69,12 +70,4 @@ func (s *Service) Status(ctx context.Context, postID, userID int64) (Status, err
 		return Status{}, ErrForbidden
 	}
 	return s.repository.Status(ctx, postID)
-}
-
-func (s *Service) Unconfirmed(ctx context.Context, postID, userID int64) ([]UserSummary, error) {
-	allowed, err := s.repository.CanViewStatus(ctx, postID, userID)
-	if err != nil || !allowed {
-		return nil, ErrForbidden
-	}
-	return s.repository.Unconfirmed(ctx, postID)
 }

@@ -97,29 +97,30 @@ func (h *Handler) Timeline(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Read(w http.ResponseWriter, r *http.Request) {
-	h.mark(w, r, false)
-}
-
-func (h *Handler) Confirm(w http.ResponseWriter, r *http.Request) {
-	h.mark(w, r, true)
-}
-
-func (h *Handler) mark(w http.ResponseWriter, r *http.Request, confirm bool) {
 	id, err := postID(r)
 	if err != nil {
 		bad(w, http.StatusBadRequest, "IDが不正です")
 		return
 	}
-	err = h.service.Mark(r.Context(), id, currentUserID(r), confirm)
+	err = h.service.MarkRead(r.Context(), id, currentUserID(r))
 	if errors.Is(err, ErrForbidden) {
 		bad(w, http.StatusForbidden, "この投稿の対象者ではありません")
 		return
 	}
 	if err != nil {
-		bad(w, http.StatusInternalServerError, "確認状態を保存できませんでした")
+		bad(w, http.StatusInternalServerError, "既読状態を保存できませんでした")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) Authored(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.Authored(r.Context(), currentUserID(r))
+	if err != nil {
+		bad(w, http.StatusInternalServerError, "作成した連絡を取得できませんでした")
+		return
+	}
+	out(w, http.StatusOK, items)
 }
 
 func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
@@ -130,30 +131,12 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.service.Status(r.Context(), id, currentUserID(r))
 	if errors.Is(err, ErrForbidden) {
-		bad(w, http.StatusForbidden, "確認状況は連絡作成者または管理者だけが閲覧できます")
+		bad(w, http.StatusForbidden, "既読状況は連絡作成者または管理者だけが閲覧できます")
 		return
 	}
 	if err != nil {
-		bad(w, http.StatusInternalServerError, "確認状況を取得できませんでした")
+		bad(w, http.StatusInternalServerError, "既読状況を取得できませんでした")
 		return
 	}
 	out(w, http.StatusOK, item)
-}
-
-func (h *Handler) Unconfirmed(w http.ResponseWriter, r *http.Request) {
-	id, err := postID(r)
-	if err != nil {
-		bad(w, http.StatusBadRequest, "IDが不正です")
-		return
-	}
-	items, err := h.service.Unconfirmed(r.Context(), id, currentUserID(r))
-	if errors.Is(err, ErrForbidden) {
-		bad(w, http.StatusForbidden, "確認状況は連絡作成者または管理者だけが閲覧できます")
-		return
-	}
-	if err != nil {
-		bad(w, http.StatusInternalServerError, "未確認者を取得できませんでした")
-		return
-	}
-	out(w, http.StatusOK, items)
 }
