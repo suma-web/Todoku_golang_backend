@@ -95,7 +95,6 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
-	router.Post("/api/signup", userHandler.Signup)
 	router.Post("/api/login", userHandler.Login)
 	router.Post("/api/logout", userHandler.Logout)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me", userHandler.Me)

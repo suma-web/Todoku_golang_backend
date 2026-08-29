@@ -89,7 +89,7 @@ postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable
 
 | 分類 | エンドポイント例 |
 | --- | --- |
-| 認証 | `POST /api/signup`、`POST /api/login`、`POST /api/logout`、`GET /api/me` |
+| 認証 | `POST /api/login`、`POST /api/logout`、`GET /api/me` |
 | ユーザー管理 | `POST /api/admin/users`、`GET /api/admin/users`、`PATCH /api/admin/users/{id}` |
 | 所属管理 | `GET /api/school-groups`、`POST /api/school-groups` |
 | 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}` |
@@ -101,7 +101,7 @@ postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable
 
 学校機能APIは認証を必要とし、管理機能・教員機能にはRoleによるアクセス制御があります。
 
-`POST /api/signup`はAPIとして残っていますが、現在のフロントエンドには公開新規登録画面がありません。通常の学校運用では、管理者が`POST /api/admin/users`を通じてアカウントを発行します。
+公開signup APIは提供していません。アカウントは管理者が認証済みの`POST /api/admin/users`を通じて発行します。
 
 ## テスト
 
