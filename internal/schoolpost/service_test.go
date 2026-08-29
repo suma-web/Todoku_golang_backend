@@ -21,7 +21,7 @@ func (s *schoolPostRepositoryStub) CanViewStatus(_ context.Context, _, _ int64) 
 }
 
 func (s *schoolPostRepositoryStub) Status(_ context.Context, _ int64) (Status, error) {
-	return Status{TargetCount: 3, ConfirmedCount: 1}, nil
+	return Status{TargetCount: 3, ReadCount: 1}, nil
 }
 
 func TestServiceCreateValidatesAndNormalizesInput(t *testing.T) {
@@ -60,7 +60,7 @@ func TestServiceStatusReturnsDetailsForAllowedViewer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status() error = %v", err)
 	}
-	if status.TargetCount != 3 || status.ConfirmedCount != 1 {
+	if status.TargetCount != 3 || status.ReadCount != 1 {
 		t.Fatalf("Status() = %#v", status)
 	}
 }

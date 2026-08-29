@@ -255,10 +255,10 @@ func seedStatuses(ctx context.Context, tx *sql.Tx, postIDs, userIDs map[string]i
 			return err
 		}
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO school_post_statuses(post_id,user_id,read_at,confirmed_at) VALUES
-		($1,$2,TIMESTAMPTZ '2026-08-28 09:00:00+09',TIMESTAMPTZ '2026-08-28 09:05:00+09'),
-		($1,$3,TIMESTAMPTZ '2026-08-28 10:00:00+09',NULL),
-		($4,$2,TIMESTAMPTZ '2026-08-28 11:00:00+09',TIMESTAMPTZ '2026-08-28 11:05:00+09')`,
+	_, err := tx.ExecContext(ctx, `INSERT INTO school_post_statuses(post_id,user_id,read_at) VALUES
+		($1,$2,TIMESTAMPTZ '2026-08-28 09:00:00+09'),
+		($1,$3,TIMESTAMPTZ '2026-08-28 10:00:00+09'),
+		($4,$2,TIMESTAMPTZ '2026-08-28 11:00:00+09')`,
 		postIDs["career"], userIDs["yamada"], userIDs["sasaki"], postIDs["soccer"])
 	return err
 }
@@ -323,9 +323,8 @@ func verify(ctx context.Context, db *sql.DB) error {
 func verifyStatuses(ctx context.Context, db *sql.DB) error {
 	repository := schoolpost.NewRepository(db)
 	expected := map[string]schoolpost.Status{
-		"進路希望調査の提出について": {TargetCount: 2, ReadCount: 2, ConfirmedCount: 1, UnconfirmedCount: 1},
-		// 鈴木先生もサッカー部所属のため、現在の集計仕様では対象者に含まれます。
-		"土曜日の練習時間変更": {TargetCount: 3, ReadCount: 1, ConfirmedCount: 1, UnconfirmedCount: 2},
+		"進路希望調査の提出について": {TargetCount: 2, ReadCount: 2, UnreadCount: 0},
+		"土曜日の練習時間変更":    {TargetCount: 2, ReadCount: 1, UnreadCount: 1},
 	}
 	for title, want := range expected {
 		var postID int64
@@ -336,8 +335,7 @@ func verifyStatuses(ctx context.Context, db *sql.DB) error {
 		if err != nil {
 			return fmt.Errorf("verify status %s: %w", title, err)
 		}
-		if got.TargetCount != want.TargetCount || got.ReadCount != want.ReadCount ||
-			got.ConfirmedCount != want.ConfirmedCount || got.UnconfirmedCount != want.UnconfirmedCount {
+		if got.TargetCount != want.TargetCount || got.ReadCount != want.ReadCount || got.UnreadCount != want.UnreadCount {
 			return fmt.Errorf("verify status %s: got %+v, want %+v", title, got, want)
 		}
 	}
