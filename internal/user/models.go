@@ -2,13 +2,6 @@ package user
 
 import "time"
 
-type SignupRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Birthday string `json:"birthday"`
-	Password string `json:"password"`
-}
-
 type LoginRequest struct {
 	Identifier string `json:"identifier"`
 	Name       string `json:"name"`
@@ -28,14 +21,6 @@ type User struct {
 	Website      string    `json:"website"`
 	Role         string    `json:"role"`
 	IsActive     bool      `json:"is_active"`
-}
-
-type SignupResponse struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	Birthday  string `json:"birthday"`
-	CreatedAt string `json:"created_at"`
 }
 
 type LoginResponse struct {

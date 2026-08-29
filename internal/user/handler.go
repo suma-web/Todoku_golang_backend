@@ -34,98 +34,6 @@ type errorResponse struct {
 	Error errorBody `json:"error"`
 }
 
-func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	var request SignupRequest
-
-	if err := decoder.Decode(&request); err != nil {
-		writeError(
-			w,
-			http.StatusBadRequest,
-			"INVALID_JSON",
-			"リクエストの形式が正しくありません",
-		)
-		return
-	}
-
-	name := strings.TrimSpace(request.Name)
-	email := strings.ToLower(strings.TrimSpace(request.Email))
-
-	if message := validateSignup(request, name, email); message != "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", message)
-		return
-	}
-
-	birthday, err := time.Parse("2006-01-02", request.Birthday)
-	if err != nil {
-		writeError(
-			w,
-			http.StatusBadRequest,
-			"INVALID_BIRTHDAY",
-			"生年月日の形式が正しくありません",
-		)
-		return
-	}
-
-	passwordHash, err := bcrypt.GenerateFromPassword(
-		[]byte(request.Password),
-		bcrypt.DefaultCost,
-	)
-	if err != nil {
-		writeError(
-			w,
-			http.StatusInternalServerError,
-			"INTERNAL_ERROR",
-			"サーバーエラーが発生しました",
-		)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
-	createdUser, err := h.repository.Create(
-		ctx,
-		name,
-		email,
-		birthday,
-		string(passwordHash),
-	)
-	if err != nil {
-		if isUniqueViolation(err) {
-			writeError(
-				w,
-				http.StatusConflict,
-				"EMAIL_ALREADY_EXISTS",
-				"このメールアドレスは既に登録されています",
-			)
-			return
-		}
-
-		writeError(
-			w,
-			http.StatusInternalServerError,
-			"INTERNAL_ERROR",
-			"サーバーエラーが発生しました",
-		)
-		return
-	}
-
-	response := SignupResponse{
-		ID:        createdUser.ID,
-		Name:      createdUser.Name,
-		Email:     createdUser.Email,
-		Birthday:  createdUser.Birthday.Format("2006-01-02"),
-		CreatedAt: createdUser.CreatedAt.Format(time.RFC3339),
-	}
-
-	writeJSON(w, http.StatusCreated, response)
-}
-
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
@@ -335,31 +243,6 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		ID: updated.ID, Name: updated.Name, Bio: updated.Bio, Location: updated.Location,
 		Website: updated.Website, CreatedAt: updated.CreatedAt.Format(time.RFC3339),
 	})
-}
-
-func validateSignup(request SignupRequest, name, email string) string {
-	if name == "" {
-		return "名前を入力してください"
-	}
-
-	if len([]rune(name)) > 50 {
-		return "名前は50文字以内で入力してください"
-	}
-
-	address, err := mail.ParseAddress(email)
-	if err != nil || address.Address != email {
-		return "正しいメールアドレスを入力してください"
-	}
-
-	if len(request.Password) < 8 {
-		return "パスワードは8文字以上で入力してください"
-	}
-
-	if request.Birthday == "" {
-		return "生年月日を入力してください"
-	}
-
-	return ""
 }
 
 func normalizeLoginIdentifier(request LoginRequest) string {
