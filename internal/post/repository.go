@@ -32,305 +32,70 @@ func (r *Repository) Create(ctx context.Context, userID int64, doc string, image
 	return created, nil
 }
 
-func (r *Repository) List(ctx context.Context, viewerID int64, limit, offset int) ([]Post, error) {
-	const query = `
-		SELECT posts.id, posts.user_id, users.name, posts.doc,
-		       posts.image_url, posts.created_at, COUNT(retweets.id),
-		       EXISTS (
-		           SELECT 1 FROM retweets viewer_retweets
-		           WHERE viewer_retweets.post_id = posts.id
-		             AND viewer_retweets.user_id = $1
-		       ),
-		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
-		       EXISTS (
-		           SELECT 1 FROM likes viewer_likes
-		           WHERE viewer_likes.post_id = posts.id
-		             AND viewer_likes.user_id = $1
-		       ),
-		       EXISTS (
-		           SELECT 1 FROM bookmarks viewer_bookmarks
-		           WHERE viewer_bookmarks.post_id = posts.id
-		             AND viewer_bookmarks.user_id = $1
-		       )
-		FROM posts
-		JOIN users ON users.id = posts.user_id
-		LEFT JOIN retweets ON retweets.post_id = posts.id
-		GROUP BY posts.id, users.name
-		ORDER BY posts.created_at DESC, posts.id DESC
-		LIMIT $2 OFFSET $3`
+const postSelect = `
+	SELECT posts.id, posts.user_id, users.name, posts.doc,
+	       posts.image_url, posts.created_at,
+	       EXISTS (
+	           SELECT 1 FROM bookmarks viewer_bookmarks
+	           WHERE viewer_bookmarks.post_id = posts.id
+	             AND viewer_bookmarks.user_id = $1
+	       )
+	FROM posts
+	JOIN users ON users.id = posts.user_id`
 
-	rows, err := r.db.QueryContext(ctx, query, viewerID, limit, offset)
+func scanPost(scanner interface{ Scan(...any) error }) (Post, error) {
+	var item Post
+	err := scanner.Scan(
+		&item.ID, &item.UserID, &item.Name, &item.Doc,
+		&item.ImageURL, &item.CreatedAt, &item.BookmarkedByMe,
+	)
+	return item, err
+}
+
+func (r *Repository) List(ctx context.Context, viewerID int64, limit, offset int) ([]Post, error) {
+	rows, err := r.db.QueryContext(ctx, postSelect+`
+		ORDER BY posts.created_at DESC, posts.id DESC
+		LIMIT $2 OFFSET $3`, viewerID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list posts: %w", err)
 	}
 	defer rows.Close()
-
-	posts := make([]Post, 0)
-	for rows.Next() {
-		var item Post
-		if err := rows.Scan(
-			&item.ID, &item.UserID, &item.Name, &item.Doc,
-			&item.ImageURL, &item.CreatedAt, &item.RetweetCount,
-			&item.RetweetedByMe, &item.LikeCount, &item.LikedByMe,
-			&item.BookmarkedByMe,
-		); err != nil {
-			return nil, fmt.Errorf("scan post: %w", err)
-		}
-		posts = append(posts, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate posts: %w", err)
-	}
-
-	return posts, nil
+	return collectPosts(rows)
 }
 
 func (r *Repository) ListByUserName(ctx context.Context, viewerID int64, name string, limit, offset int) ([]Post, error) {
-	const query = `
-		SELECT posts.id, posts.user_id, users.name, posts.doc, posts.image_url,
-		       posts.created_at, COUNT(retweets.id),
-		       EXISTS (
-		           SELECT 1 FROM retweets viewer_retweets
-		           WHERE viewer_retweets.post_id = posts.id
-		             AND viewer_retweets.user_id = $1
-		       ),
-		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
-		       EXISTS (
-		           SELECT 1 FROM likes viewer_likes
-		           WHERE viewer_likes.post_id = posts.id
-		             AND viewer_likes.user_id = $1
-		       ),
-		       EXISTS (
-		           SELECT 1 FROM bookmarks viewer_bookmarks
-		           WHERE viewer_bookmarks.post_id = posts.id
-		             AND viewer_bookmarks.user_id = $1
-		       )
-		FROM posts
-		JOIN users ON users.id = posts.user_id
-		LEFT JOIN retweets ON retweets.post_id = posts.id
+	rows, err := r.db.QueryContext(ctx, postSelect+`
 		WHERE users.name = $2
-		GROUP BY posts.id, users.name
-		ORDER BY posts.created_at DESC, posts.id DESC LIMIT $3 OFFSET $4`
-	rows, err := r.db.QueryContext(ctx, query, viewerID, name, limit, offset)
+		ORDER BY posts.created_at DESC, posts.id DESC
+		LIMIT $3 OFFSET $4`, viewerID, name, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list user posts: %w", err)
 	}
 	defer rows.Close()
-	posts := make([]Post, 0)
+	return collectPosts(rows)
+}
+
+func collectPosts(rows *sql.Rows) ([]Post, error) {
+	items := make([]Post, 0)
 	for rows.Next() {
-		var item Post
-		if err := rows.Scan(
-			&item.ID, &item.UserID, &item.Name, &item.Doc, &item.ImageURL,
-			&item.CreatedAt, &item.RetweetCount, &item.RetweetedByMe,
-			&item.LikeCount, &item.LikedByMe, &item.BookmarkedByMe,
-		); err != nil {
-			return nil, fmt.Errorf("scan user post: %w", err)
+		item, err := scanPost(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan post: %w", err)
 		}
-		posts = append(posts, item)
+		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate user posts: %w", err)
+		return nil, fmt.Errorf("iterate posts: %w", err)
 	}
-	return posts, nil
+	return items, nil
 }
 
 func (r *Repository) FindByID(ctx context.Context, postID, viewerID int64) (Post, error) {
-	const query = `
-		SELECT posts.id, posts.user_id, users.name, posts.doc,
-		       posts.image_url, posts.created_at, COUNT(retweets.id),
-		       EXISTS (
-		           SELECT 1 FROM retweets viewer_retweets
-		           WHERE viewer_retweets.post_id = posts.id
-		             AND viewer_retweets.user_id = $2
-		       ),
-		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
-		       EXISTS (
-		           SELECT 1 FROM likes viewer_likes
-		           WHERE viewer_likes.post_id = posts.id
-		             AND viewer_likes.user_id = $2
-		       ),
-		       EXISTS (
-		           SELECT 1 FROM bookmarks viewer_bookmarks
-		           WHERE viewer_bookmarks.post_id = posts.id
-		             AND viewer_bookmarks.user_id = $2
-		       )
-		FROM posts
-		JOIN users ON users.id = posts.user_id
-		LEFT JOIN retweets ON retweets.post_id = posts.id
-		WHERE posts.id = $1
-		GROUP BY posts.id, users.name`
-
-	var found Post
-	err := r.db.QueryRowContext(ctx, query, postID, viewerID).Scan(
-		&found.ID, &found.UserID, &found.Name, &found.Doc,
-		&found.ImageURL, &found.CreatedAt, &found.RetweetCount,
-		&found.RetweetedByMe, &found.LikeCount, &found.LikedByMe,
-		&found.BookmarkedByMe,
-	)
+	item, err := scanPost(r.db.QueryRowContext(ctx, postSelect+` WHERE posts.id = $2`, viewerID, postID))
 	if err != nil {
 		return Post{}, fmt.Errorf("find post by id: %w", err)
 	}
-
-	return found, nil
-}
-
-func (r *Repository) Retweet(ctx context.Context, postID, userID int64) (RetweetResponse, error) {
-	const query = `
-		WITH inserted AS (
-			INSERT INTO retweets (post_id, user_id)
-			VALUES ($1, $2)
-			ON CONFLICT (post_id, user_id) DO NOTHING
-			RETURNING id
-		)
-		SELECT
-			(SELECT COUNT(*) FROM retweets WHERE post_id = $1)
-			    + (SELECT COUNT(*) FROM inserted),
-			EXISTS(SELECT 1 FROM inserted)`
-
-	var response RetweetResponse
-	var created bool
-	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
-		&response.RetweetCount, &created,
-	); err != nil {
-		return RetweetResponse{}, fmt.Errorf("retweet post: %w", err)
-	}
-	response.RetweetedByMe = true
-	if !created {
-		return response, ErrAlreadyRetweeted
-	}
-	return response, nil
-}
-
-func (r *Repository) UndoRetweet(ctx context.Context, postID, userID int64) (RetweetResponse, error) {
-	const query = `
-		WITH deleted AS (
-			DELETE FROM retweets
-			WHERE post_id = $1 AND user_id = $2
-			RETURNING id
-		)
-		SELECT
-			GREATEST(
-				(SELECT COUNT(*) FROM retweets WHERE post_id = $1)
-				    - (SELECT COUNT(*) FROM deleted),
-				0
-			),
-			EXISTS(SELECT 1 FROM deleted)`
-
-	var response RetweetResponse
-	var deleted bool
-	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
-		&response.RetweetCount, &deleted,
-	); err != nil {
-		return RetweetResponse{}, fmt.Errorf("undo retweet: %w", err)
-	}
-	if !deleted {
-		return response, ErrNotRetweeted
-	}
-	return response, nil
-}
-
-func (r *Repository) ListRetweetedByUser(ctx context.Context, userID int64, limit, offset int) ([]Post, error) {
-	const query = `
-		SELECT posts.id, posts.user_id, users.name, posts.doc,
-		       posts.image_url, posts.created_at, COUNT(all_retweets.id), TRUE,
-		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
-		       EXISTS (
-		           SELECT 1 FROM likes viewer_likes
-		           WHERE viewer_likes.post_id = posts.id
-		             AND viewer_likes.user_id = $1
-		       ),
-		       EXISTS (
-		           SELECT 1 FROM bookmarks viewer_bookmarks
-		           WHERE viewer_bookmarks.post_id = posts.id
-		             AND viewer_bookmarks.user_id = $1
-		       )
-		FROM retweets my_retweets
-		JOIN posts ON posts.id = my_retweets.post_id
-		JOIN users ON users.id = posts.user_id
-		LEFT JOIN retweets all_retweets ON all_retweets.post_id = posts.id
-		WHERE my_retweets.user_id = $1
-		GROUP BY posts.id, users.name, my_retweets.created_at
-		ORDER BY my_retweets.created_at DESC, posts.id DESC
-		LIMIT $2 OFFSET $3`
-
-	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("list retweeted posts: %w", err)
-	}
-	defer rows.Close()
-
-	posts := make([]Post, 0)
-	for rows.Next() {
-		var item Post
-		if err := rows.Scan(
-			&item.ID, &item.UserID, &item.Name, &item.Doc,
-			&item.ImageURL, &item.CreatedAt, &item.RetweetCount,
-			&item.RetweetedByMe, &item.LikeCount, &item.LikedByMe,
-			&item.BookmarkedByMe,
-		); err != nil {
-			return nil, fmt.Errorf("scan retweeted post: %w", err)
-		}
-		posts = append(posts, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate retweeted posts: %w", err)
-	}
-	return posts, nil
-}
-
-func (r *Repository) Like(ctx context.Context, postID, userID int64) (LikeResponse, error) {
-	const query = `
-		WITH inserted AS (
-			INSERT INTO likes (post_id, user_id)
-			VALUES ($1, $2)
-			ON CONFLICT (post_id, user_id) DO NOTHING
-			RETURNING id
-		)
-		SELECT
-			(SELECT COUNT(*) FROM likes WHERE post_id = $1)
-			    + (SELECT COUNT(*) FROM inserted),
-			EXISTS(SELECT 1 FROM inserted)`
-
-	var response LikeResponse
-	var created bool
-	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
-		&response.LikeCount, &created,
-	); err != nil {
-		return LikeResponse{}, fmt.Errorf("like post: %w", err)
-	}
-	response.LikedByMe = true
-	if !created {
-		return response, ErrAlreadyLiked
-	}
-	return response, nil
-}
-
-func (r *Repository) UndoLike(ctx context.Context, postID, userID int64) (LikeResponse, error) {
-	const query = `
-		WITH deleted AS (
-			DELETE FROM likes
-			WHERE post_id = $1 AND user_id = $2
-			RETURNING id
-		)
-		SELECT
-			GREATEST(
-				(SELECT COUNT(*) FROM likes WHERE post_id = $1)
-				    - (SELECT COUNT(*) FROM deleted),
-				0
-			),
-			EXISTS(SELECT 1 FROM deleted)`
-
-	var response LikeResponse
-	var deleted bool
-	if err := r.db.QueryRowContext(ctx, query, postID, userID).Scan(
-		&response.LikeCount, &deleted,
-	); err != nil {
-		return LikeResponse{}, fmt.Errorf("undo like: %w", err)
-	}
-	if !deleted {
-		return response, ErrNotLiked
-	}
-	return response, nil
+	return item, nil
 }
 
 func (r *Repository) Bookmark(ctx context.Context, postID, userID int64) (BookmarkResponse, error) {
@@ -365,50 +130,20 @@ func (r *Repository) UndoBookmark(ctx context.Context, postID, userID int64) (Bo
 }
 
 func (r *Repository) ListBookmarkedByUser(ctx context.Context, userID int64, limit, offset int) ([]Post, error) {
-	const query = `
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT posts.id, posts.user_id, users.name, posts.doc,
-		       posts.image_url, posts.created_at, COUNT(all_retweets.id),
-		       EXISTS (
-		           SELECT 1 FROM retweets viewer_retweets
-		           WHERE viewer_retweets.post_id = posts.id
-		             AND viewer_retweets.user_id = $1
-		       ),
-		       (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id),
-		       EXISTS (
-		           SELECT 1 FROM likes viewer_likes
-		           WHERE viewer_likes.post_id = posts.id
-		             AND viewer_likes.user_id = $1
-		       ), TRUE
+		       posts.image_url, posts.created_at, TRUE
 		FROM bookmarks my_bookmarks
 		JOIN posts ON posts.id = my_bookmarks.post_id
 		JOIN users ON users.id = posts.user_id
-		LEFT JOIN retweets all_retweets ON all_retweets.post_id = posts.id
 		WHERE my_bookmarks.user_id = $1
-		GROUP BY posts.id, users.name, my_bookmarks.created_at
 		ORDER BY my_bookmarks.created_at DESC, posts.id DESC
-		LIMIT $2 OFFSET $3`
-	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
+		LIMIT $2 OFFSET $3`, userID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list bookmarked posts: %w", err)
 	}
 	defer rows.Close()
-	posts := make([]Post, 0)
-	for rows.Next() {
-		var item Post
-		if err := rows.Scan(
-			&item.ID, &item.UserID, &item.Name, &item.Doc,
-			&item.ImageURL, &item.CreatedAt, &item.RetweetCount,
-			&item.RetweetedByMe, &item.LikeCount, &item.LikedByMe,
-			&item.BookmarkedByMe,
-		); err != nil {
-			return nil, fmt.Errorf("scan bookmarked post: %w", err)
-		}
-		posts = append(posts, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate bookmarked posts: %w", err)
-	}
-	return posts, nil
+	return collectPosts(rows)
 }
 
 func (r *Repository) PostExists(ctx context.Context, postID int64) (bool, error) {
@@ -420,10 +155,6 @@ func (r *Repository) PostExists(ctx context.Context, postID int64) (bool, error)
 	return exists, nil
 }
 
-var ErrAlreadyRetweeted = errors.New("post already retweeted")
-var ErrNotRetweeted = errors.New("post is not retweeted")
-var ErrAlreadyLiked = errors.New("post already liked")
-var ErrNotLiked = errors.New("post is not liked")
 var ErrAlreadyBookmarked = errors.New("post already bookmarked")
 var ErrNotBookmarked = errors.New("post is not bookmarked")
 

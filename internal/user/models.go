@@ -48,15 +48,14 @@ type LoginResponse struct {
 }
 
 type CurrentUserResponse struct {
-	ID           int64  `json:"id"`
-	Name         string `json:"name"`
-	Bio          string `json:"bio"`
-	Location     string `json:"location"`
-	Website      string `json:"website"`
-	CreatedAt    string `json:"created_at"`
-	FollowedByMe bool   `json:"followed_by_me"`
-	Role         string `json:"role"`
-	IsActive     bool   `json:"is_active"`
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Bio       string `json:"bio"`
+	Location  string `json:"location"`
+	Website   string `json:"website"`
+	CreatedAt string `json:"created_at"`
+	Role      string `json:"role"`
+	IsActive  bool   `json:"is_active"`
 }
 
 type AdminCreateUserRequest struct {
@@ -64,10 +63,6 @@ type AdminCreateUserRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Role     string `json:"role"`
-}
-
-type FollowResponse struct {
-	FollowedByMe bool `json:"followed_by_me"`
 }
 
 type UpdateProfileRequest struct {
