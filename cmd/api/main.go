@@ -114,6 +114,7 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Get("/api/school-posts/{id}/status", schoolPostHandler.Status)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/question-categories", questionHandler.ListCategories)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Post("/api/question-categories", questionHandler.CreateCategory)
+	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Patch("/api/question-categories/{id}", questionHandler.UpdateCategory)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/questions", questionHandler.Create)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/questions", questionHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/questions/{id}", questionHandler.Get)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 type schoolPostRepositoryStub struct {
@@ -44,6 +45,16 @@ func TestServiceCreateRequiresTargetGroup(t *testing.T) {
 	_, err := service.Create(context.Background(), 3, Post{Title: "連絡", Content: "本文"})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("Create() error = %v, want ErrValidation", err)
+	}
+}
+
+func TestServiceCreateRejectsPastOrOverTwoYearExpiration(t *testing.T) {
+	service := NewService(&schoolPostRepositoryStub{})
+	for _, expiresAt := range []time.Time{time.Now().Add(-time.Hour), time.Now().AddDate(2, 0, 1)} {
+		_, err := service.Create(context.Background(), 3, Post{Title: "連絡", Content: "本文", GroupIDs: []int64{1}, ExpiresAt: &expiresAt})
+		if !errors.Is(err, ErrValidation) {
+			t.Fatalf("Create() expiration %v error = %v, want ErrValidation", expiresAt, err)
+		}
 	}
 }
 

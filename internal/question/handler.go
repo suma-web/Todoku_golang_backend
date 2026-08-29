@@ -65,6 +65,30 @@ func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	output(w, http.StatusCreated, item)
 }
 
+func (h *Handler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		failure(w, http.StatusBadRequest, "INVALID_ID", "カテゴリIDが不正です")
+		return
+	}
+	var input Category
+	if json.NewDecoder(r.Body).Decode(&input) != nil {
+		failure(w, http.StatusBadRequest, "INVALID_JSON", "入力が不正です")
+		return
+	}
+	input.ID = id
+	item, err := h.service.UpdateCategory(r.Context(), input)
+	if errors.Is(err, ErrValidation) {
+		failure(w, http.StatusBadRequest, "VALIDATION_ERROR", "カテゴリ名と担当部署を指定してください")
+		return
+	}
+	if err != nil {
+		failure(w, http.StatusConflict, "CATEGORY_UPDATE_FAILED", "カテゴリを更新できませんでした")
+		return
+	}
+	output(w, http.StatusOK, item)
+}
+
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var input Question
 	if json.NewDecoder(r.Body).Decode(&input) != nil {

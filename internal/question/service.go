@@ -37,6 +37,18 @@ func (s *Service) CreateCategory(ctx context.Context, input Category) (Category,
 	return item, nil
 }
 
+func (s *Service) UpdateCategory(ctx context.Context, input Category) (Category, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	if input.ID < 1 || input.Name == "" || input.GroupID < 1 {
+		return Category{}, ErrValidation
+	}
+	item, err := s.repository.UpdateCategory(ctx, input)
+	if err != nil {
+		return Category{}, ErrConflict
+	}
+	return item, nil
+}
+
 func (s *Service) Create(ctx context.Context, userID int64, input Question) (Question, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.Content = strings.TrimSpace(input.Content)

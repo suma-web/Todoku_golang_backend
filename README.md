@@ -30,6 +30,8 @@ Twitterクローンとして実装した認証、投稿、コメント、通知�
 - 学年、クラス、部活動、委員会、部署の所属管理
 - 所属を対象にした学校連絡の作成・配信
 - 詳細画面の「既読にする」による明示的な既読登録と、連絡作成者・管理者による既読・未読ユーザーの確認
+- 期限切れ連絡の通常ユーザー向け非表示、期限なしの古い連絡に対する注意表示
+- 投稿者本人または管理者による学校連絡の削除
 - 質問カテゴリと担当部署の管理
 - 公開質問、個別相談、回答、解決状態の管理
 - 権限を考慮した学校内横断検索
@@ -92,9 +94,10 @@ postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable
 | 認証 | `POST /api/login`、`POST /api/logout`、`GET /api/me` |
 | ユーザー管理 | `POST /api/admin/users`、`GET /api/admin/users`、`PATCH /api/admin/users/{id}` |
 | 所属管理 | `GET /api/school-groups`、`POST /api/school-groups` |
-| 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}` |
+| 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}`、`DELETE /api/school-posts/{id}` |
 | 既読状況 | `POST /api/school-posts/{id}/read`、`GET /api/school-posts/{id}/status`、`GET /api/me/school-posts` |
 | 質問・相談 | `GET /api/questions`、`POST /api/questions`、`POST /api/questions/{id}/answers` |
+| 質問カテゴリ管理 | `POST /api/question-categories`、`PATCH /api/question-categories/{id}` |
 | 横断検索 | `GET /api/search?q={検索語}` |
 | 投稿・コメント | `GET /api/posts`、`POST /api/posts`、`POST /api/posts/{id}/comments` |
 | 通知・ブックマーク | `GET /api/notifications`、`GET /api/bookmarks`、`POST /api/posts/{id}/bookmarks` |

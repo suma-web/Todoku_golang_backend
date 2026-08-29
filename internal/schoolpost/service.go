@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 )
 
 var (
@@ -25,6 +26,12 @@ func (s *Service) Create(ctx context.Context, authorID int64, input Post) (Post,
 	input.Content = strings.TrimSpace(input.Content)
 	if input.Title == "" || input.Content == "" || len(input.GroupIDs) == 0 {
 		return Post{}, ErrValidation
+	}
+	if input.ExpiresAt != nil {
+		now := time.Now()
+		if !input.ExpiresAt.After(now) || input.ExpiresAt.After(now.AddDate(2, 0, 0)) {
+			return Post{}, ErrValidation
+		}
 	}
 	return s.repository.Create(ctx, authorID, input)
 }

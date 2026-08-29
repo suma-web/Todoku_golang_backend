@@ -8,6 +8,7 @@ import (
 type Repository interface {
 	ListCategories(context.Context) ([]Category, error)
 	CreateCategory(context.Context, Category) (Category, error)
+	UpdateCategory(context.Context, Category) (Category, error)
 	Create(context.Context, int64, Question) (Question, error)
 	List(context.Context, int64, string) ([]Question, error)
 	CanAccess(context.Context, int64, int64) (bool, error)
@@ -43,7 +44,7 @@ func scanQuestion(row scanner) (Question, error) {
 }
 
 func (r *SQLRepository) ListCategories(ctx context.Context) ([]Category, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT c.id,c.name,c.group_id,g.name FROM question_categories c JOIN school_groups g ON g.id=c.group_id ORDER BY c.name`)
+	rows, err := r.db.QueryContext(ctx, `SELECT c.id,c.name,c.group_id,g.name,c.is_active FROM question_categories c JOIN school_groups g ON g.id=c.group_id ORDER BY c.is_active DESC,c.name`)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func (r *SQLRepository) ListCategories(ctx context.Context) ([]Category, error) 
 	items := []Category{}
 	for rows.Next() {
 		var item Category
-		if err := rows.Scan(&item.ID, &item.Name, &item.GroupID, &item.GroupName); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.GroupID, &item.GroupName, &item.IsActive); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -62,11 +63,24 @@ func (r *SQLRepository) ListCategories(ctx context.Context) ([]Category, error) 
 
 func (r *SQLRepository) CreateCategory(ctx context.Context, input Category) (Category, error) {
 	err := r.db.QueryRowContext(ctx, `INSERT INTO question_categories(name,group_id) VALUES($1,$2) RETURNING id`, input.Name, input.GroupID).Scan(&input.ID)
+	if err == nil {
+		err = r.db.QueryRowContext(ctx, `SELECT name FROM school_groups WHERE id=$1`, input.GroupID).Scan(&input.GroupName)
+	}
+	input.IsActive = true
+	return input, err
+}
+
+func (r *SQLRepository) UpdateCategory(ctx context.Context, input Category) (Category, error) {
+	err := r.db.QueryRowContext(ctx, `UPDATE question_categories SET name=$2,group_id=$3,is_active=$4 WHERE id=$1 RETURNING id`, input.ID, input.Name, input.GroupID, input.IsActive).Scan(&input.ID)
+	if err != nil {
+		return Category{}, err
+	}
+	err = r.db.QueryRowContext(ctx, `SELECT name FROM school_groups WHERE id=$1`, input.GroupID).Scan(&input.GroupName)
 	return input, err
 }
 
 func (r *SQLRepository) Create(ctx context.Context, userID int64, input Question) (Question, error) {
-	err := r.db.QueryRowContext(ctx, `INSERT INTO questions(user_id,category_id,title,content,visibility) VALUES($1,$2,$3,$4,$5) RETURNING id,status,created_at,updated_at`,
+	err := r.db.QueryRowContext(ctx, `INSERT INTO questions(user_id,category_id,title,content,visibility) SELECT $1,$2,$3,$4,$5 WHERE EXISTS(SELECT 1 FROM question_categories WHERE id=$2 AND is_active) RETURNING id,status,created_at,updated_at`,
 		userID, input.CategoryID, input.Title, input.Content, input.Visibility,
 	).Scan(&input.ID, &input.Status, &input.CreatedAt, &input.UpdatedAt)
 	input.UserID = userID
