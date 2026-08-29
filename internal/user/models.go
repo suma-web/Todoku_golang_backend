@@ -3,10 +3,8 @@ package user
 import "time"
 
 type LoginRequest struct {
-	Identifier string `json:"identifier"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Password   string `json:"password"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type User struct {

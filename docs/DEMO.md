@@ -39,7 +39,7 @@ go run ./cmd/seed
 | student | 【デモ】佐々木花子 | `demo.sasaki@school.local` | `DemoSasaki@2026` | 2年、2年A組、文化祭委員会 |
 | student | 【デモ】高橋健 | `demo.takahashi@school.local` | `DemoTakahashi@2026` | 3年、3年B組、サッカー部 |
 
-ログイン画面では、メールアドレスまたは表示名と初期パスワードを使用できます。
+ログイン画面では、メールアドレスと初期パスワードを使用します。
 
 ## 作成される所属
 
