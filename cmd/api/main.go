@@ -14,7 +14,6 @@ import (
 	"twitter_golang_backend/internal/comment"
 	"twitter_golang_backend/internal/config"
 	"twitter_golang_backend/internal/database"
-	"twitter_golang_backend/internal/message"
 	"twitter_golang_backend/internal/notification"
 	"twitter_golang_backend/internal/post"
 	"twitter_golang_backend/internal/question"
@@ -49,8 +48,6 @@ func main() {
 	commentHandler := comment.NewHandler(commentRepository)
 	notificationRepository := notification.NewRepository(db)
 	notificationHandler := notification.NewHandler(notificationRepository)
-	messageRepository := message.NewRepository(db)
-	messageHandler := message.NewHandler(messageRepository)
 	schoolGroupHandler := schoolgroup.NewHandler(db)
 	schoolPostRepository := schoolpost.NewRepository(db)
 	schoolPostService := schoolpost.NewService(schoolPostRepository)
@@ -132,17 +129,10 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/users/{name}/follow", userHandler.Follow)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/users/{name}/follow", userHandler.Unfollow)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts", postHandler.List)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}", postHandler.Get)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}", postHandler.Delete)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts", postHandler.Create)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me/retweets", postHandler.ListMyRetweets)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/retweets", postHandler.Retweet)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}/retweets", postHandler.UndoRetweet)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/likes", postHandler.Like)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}/likes", postHandler.UndoLike)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/bookmarks", postHandler.Bookmark)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}/bookmarks", postHandler.UndoBookmark)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/bookmarks", postHandler.ListBookmarks)
@@ -151,11 +141,6 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/comments", commentHandler.Create)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/comments/{id}", commentHandler.Delete)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/notifications", notificationHandler.List)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/groups", messageHandler.CreateGroup)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/groups", messageHandler.ListGroups)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/groups/{id}", messageHandler.GetGroup)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/groups/{id}/messages", messageHandler.CreateMessage)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/groups/{id}/messages", messageHandler.ListMessages)
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	server := &http.Server{

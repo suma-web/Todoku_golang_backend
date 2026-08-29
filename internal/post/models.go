@@ -9,21 +9,7 @@ type Post struct {
 	Doc            string    `json:"doc"`
 	ImageURL       *string   `json:"image_url"`
 	CreatedAt      time.Time `json:"created_at"`
-	RetweetCount   int64     `json:"retweet_count"`
-	RetweetedByMe  bool      `json:"retweeted_by_me"`
-	LikeCount      int64     `json:"like_count"`
-	LikedByMe      bool      `json:"liked_by_me"`
 	BookmarkedByMe bool      `json:"bookmarked_by_me"`
-}
-
-type RetweetResponse struct {
-	RetweetCount  int64 `json:"retweet_count"`
-	RetweetedByMe bool  `json:"retweeted_by_me"`
-}
-
-type LikeResponse struct {
-	LikeCount int64 `json:"like_count"`
-	LikedByMe bool  `json:"liked_by_me"`
 }
 
 type BookmarkResponse struct {

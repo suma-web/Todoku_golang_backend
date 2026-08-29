@@ -287,11 +287,6 @@ func (h *Handler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(chi.URLParam(r, "name"))
-	viewerID, ok := auth.UserID(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	found, err := h.repository.FindByName(ctx, name)
@@ -303,61 +298,10 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "プロフィールを取得できませんでした")
 		return
 	}
-	followedByMe := false
-	if viewerID != found.ID {
-		followedByMe, err = h.repository.IsFollowing(ctx, viewerID, found.ID)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "プロフィールを取得できませんでした")
-			return
-		}
-	}
 	writeJSON(w, http.StatusOK, CurrentUserResponse{
 		ID: found.ID, Name: found.Name, Bio: found.Bio, Location: found.Location,
 		Website: found.Website, CreatedAt: found.CreatedAt.Format(time.RFC3339),
-		FollowedByMe: followedByMe,
 	})
-}
-
-func (h *Handler) Follow(w http.ResponseWriter, r *http.Request) {
-	h.changeFollow(w, r, true)
-}
-
-func (h *Handler) Unfollow(w http.ResponseWriter, r *http.Request) {
-	h.changeFollow(w, r, false)
-}
-
-func (h *Handler) changeFollow(w http.ResponseWriter, r *http.Request, follow bool) {
-	viewerID, ok := auth.UserID(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "ログインが必要です")
-		return
-	}
-	name := strings.TrimSpace(chi.URLParam(r, "name"))
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	target, err := h.repository.FindByName(ctx, name)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "USER_NOT_FOUND", "ユーザーが見つかりません")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "フォロー状態を変更できませんでした")
-		return
-	}
-	if viewerID == target.ID {
-		writeError(w, http.StatusBadRequest, "CANNOT_FOLLOW_SELF", "自分自身はフォローできません")
-		return
-	}
-	if follow {
-		err = h.repository.Follow(ctx, viewerID, target.ID)
-	} else {
-		err = h.repository.Unfollow(ctx, viewerID, target.ID)
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "フォロー状態を変更できませんでした")
-		return
-	}
-	writeJSON(w, http.StatusOK, FollowResponse{FollowedByMe: follow})
 }
 
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
