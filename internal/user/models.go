@@ -48,10 +48,3 @@ type AdminCreateUserRequest struct {
 	Password string `json:"password"`
 	Role     string `json:"role"`
 }
-
-type UpdateProfileRequest struct {
-	Name     string `json:"name"`
-	Bio      string `json:"bio"`
-	Location string `json:"location"`
-	Website  string `json:"website"`
-}

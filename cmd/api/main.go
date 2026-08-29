@@ -11,11 +11,8 @@ import (
 	"github.com/go-chi/cors"
 
 	"twitter_golang_backend/internal/auth"
-	"twitter_golang_backend/internal/comment"
 	"twitter_golang_backend/internal/config"
 	"twitter_golang_backend/internal/database"
-	"twitter_golang_backend/internal/notification"
-	"twitter_golang_backend/internal/post"
 	"twitter_golang_backend/internal/question"
 	"twitter_golang_backend/internal/schooladmin"
 	"twitter_golang_backend/internal/schoolgroup"
@@ -42,12 +39,6 @@ func main() {
 
 	userRepository := user.NewRepository(db)
 	userHandler := user.NewHandler(userRepository, cfg.SessionSecret)
-	postRepository := post.NewRepository(db)
-	postHandler := post.NewHandler(postRepository, "uploads")
-	commentRepository := comment.NewRepository(db)
-	commentHandler := comment.NewHandler(commentRepository)
-	notificationRepository := notification.NewRepository(db)
-	notificationHandler := notification.NewHandler(notificationRepository)
 	schoolGroupHandler := schoolgroup.NewHandler(db)
 	schoolPostRepository := schoolpost.NewRepository(db)
 	schoolPostService := schoolpost.NewService(schoolPostRepository)
@@ -125,22 +116,6 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Get("/api/admin/users", schoolAdminHandler.ListUsers)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Patch("/api/admin/users/{id}", schoolAdminHandler.UpdateUser)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Get("/api/school-groups/{groupId}/members", schoolGroupHandler.Members)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/me", userHandler.UpdateProfile)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/me", userHandler.DeleteAccount)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/users/{name}", userHandler.Profile)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts", postHandler.List)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}", postHandler.Get)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}", postHandler.Delete)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts", postHandler.Create)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/bookmarks", postHandler.Bookmark)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/posts/{id}/bookmarks", postHandler.UndoBookmark)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/bookmarks", postHandler.ListBookmarks)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/me/comments", commentHandler.ListMine)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/posts/{id}/comments", commentHandler.List)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/posts/{id}/comments", commentHandler.Create)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/comments/{id}", commentHandler.Delete)
-	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/notifications", notificationHandler.List)
-	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
