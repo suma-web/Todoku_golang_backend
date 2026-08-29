@@ -25,7 +25,7 @@ Twitterクローンとして実装した認証、投稿、コメント、通知�
 
 ## 主な機能
 
-- セッションCookieを用いた認証
+- セッションCookieを用いたログイン・ログアウト
 - 生徒・教員・管理者のRoleベースアクセス制御
 - 学年、クラス、部活動、委員会、部署の所属管理
 - 所属を対象にした学校連絡の作成・配信
@@ -33,6 +33,7 @@ Twitterクローンとして実装した認証、投稿、コメント、通知�
 - 質問カテゴリと担当部署の管理
 - 公開質問、個別相談、回答、解決状態の管理
 - 権限を考慮した学校内横断検索
+- 管理者によるアカウント追加（ユーザー名、メールアドレス、初期パスワード、Role）
 - 管理者によるユーザーRole・有効状態の管理
 - 投稿、コメント、コメント通知、ブックマーク
 
@@ -42,7 +43,7 @@ Twitterクローンとして実装した認証、投稿、コメント、通知�
 | --- | --- |
 | `student` | 連絡の閲覧・確認、質問・相談、検索 |
 | `teacher` | 生徒の機能に加え、連絡作成、確認状況の閲覧、質問への回答 |
-| `admin` | 教員の機能に加え、ユーザー、所属、質問カテゴリの管理 |
+| `admin` | 教員の機能に加え、アカウント発行、ユーザー、所属、質問カテゴリの管理 |
 
 ## 使用技術
 
@@ -88,19 +89,24 @@ postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable
 
 | 分類 | エンドポイント例 |
 | --- | --- |
-| 認証 | `POST /api/signup`、`POST /api/login`、`GET /api/me` |
-| ユーザー管理 | `GET /api/admin/users`、`PATCH /api/admin/users/{id}` |
+| 認証 | `POST /api/signup`、`POST /api/login`、`POST /api/logout`、`GET /api/me` |
+| ユーザー管理 | `POST /api/admin/users`、`GET /api/admin/users`、`PATCH /api/admin/users/{id}` |
 | 所属管理 | `GET /api/school-groups`、`POST /api/school-groups` |
 | 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}` |
 | 既読・確認 | `POST /api/school-posts/{id}/read`、`POST /api/school-posts/{id}/confirm`、`GET /api/school-posts/{id}/status` |
 | 質問・相談 | `GET /api/questions`、`POST /api/questions`、`POST /api/questions/{id}/answers` |
 | 横断検索 | `GET /api/search?q={検索語}` |
+| 投稿・コメント | `GET /api/posts`、`POST /api/posts`、`POST /api/posts/{id}/comments` |
+| 通知・ブックマーク | `GET /api/notifications`、`GET /api/bookmarks`、`POST /api/posts/{id}/bookmarks` |
 
 学校機能APIは認証を必要とし、管理機能・教員機能にはRoleによるアクセス制御があります。
+
+`POST /api/signup`はAPIとして残っていますが、現在のフロントエンドには公開新規登録画面がありません。通常の学校運用では、管理者が`POST /api/admin/users`を通じてアカウントを発行します。
 
 ## テスト
 
 ```bash
+go vet ./...
 go test ./...
 ```
 
@@ -128,7 +134,10 @@ ServiceはRepositoryインターフェースへ依存するため、PostgreSQL�
 ├── cmd/api/main.go          # APIサーバーとルーティング
 ├── internal/
 │   ├── auth/                # 認証・Role認可
+│   ├── comment/             # 投稿へのコメント
 │   ├── database/            # PostgreSQL接続とマイグレーション
+│   ├── notification/        # コメント通知
+│   ├── post/                # 投稿・ブックマーク
 │   ├── schooladmin/         # 管理者向けユーザー管理
 │   ├── schoolgroup/         # 所属管理
 │   ├── schoolpost/          # 学校連絡・既読・確認
