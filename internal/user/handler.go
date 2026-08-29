@@ -52,9 +52,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identifier := normalizeLoginIdentifier(request)
+	email := strings.ToLower(strings.TrimSpace(request.Email))
 
-	if message := validateLogin(identifier, request.Password); message != "" {
+	if message := validateLogin(email, request.Password); message != "" {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", message)
 		return
 	}
@@ -62,7 +62,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	foundUser, err := h.repository.FindByLoginIdentifier(ctx, identifier)
+	foundUser, err := h.repository.FindByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeInvalidCredentials(w)
@@ -245,21 +245,10 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func normalizeLoginIdentifier(request LoginRequest) string {
-	if strings.TrimSpace(request.Identifier) != "" {
-		return strings.TrimSpace(request.Identifier)
-	}
-
-	if strings.TrimSpace(request.Email) != "" {
-		return strings.ToLower(strings.TrimSpace(request.Email))
-	}
-
-	return strings.TrimSpace(request.Name)
-}
-
-func validateLogin(identifier, password string) string {
-	if identifier == "" {
-		return "ユーザー名またはメールアドレスを入力してください"
+func validateLogin(email, password string) string {
+	address, err := mail.ParseAddress(email)
+	if email == "" || err != nil || address.Address != email {
+		return "正しいメールアドレスを入力してください"
 	}
 
 	if password == "" {

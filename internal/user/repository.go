@@ -15,21 +15,19 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) FindByLoginIdentifier(
+func (r *Repository) FindByEmail(
 	ctx context.Context,
-	identifier string,
+	email string,
 ) (User, error) {
 	const query = `
 			SELECT id, name, email, birthday, password_hash, created_at, role, is_active
 		FROM users
-		WHERE LOWER(email) = LOWER($1) OR name = $1
-		ORDER BY id
-		LIMIT 1
+		WHERE LOWER(email) = LOWER($1)
 	`
 
 	var foundUser User
 
-	err := r.db.QueryRowContext(ctx, query, identifier).Scan(
+	err := r.db.QueryRowContext(ctx, query, email).Scan(
 		&foundUser.ID,
 		&foundUser.Name,
 		&foundUser.Email,
@@ -44,7 +42,7 @@ func (r *Repository) FindByLoginIdentifier(
 			return User{}, sql.ErrNoRows
 		}
 
-		return User{}, fmt.Errorf("find user by login identifier: %w", err)
+		return User{}, fmt.Errorf("find user by email: %w", err)
 	}
 
 	return foundUser, nil

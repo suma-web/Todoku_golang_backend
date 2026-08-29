@@ -63,10 +63,18 @@ func (s *Service) Mark(ctx context.Context, postID, userID int64, confirm bool) 
 	return s.repository.MarkRead(ctx, postID, userID)
 }
 
-func (s *Service) Status(ctx context.Context, postID int64) (Status, error) {
+func (s *Service) Status(ctx context.Context, postID, userID int64) (Status, error) {
+	allowed, err := s.repository.CanViewStatus(ctx, postID, userID)
+	if err != nil || !allowed {
+		return Status{}, ErrForbidden
+	}
 	return s.repository.Status(ctx, postID)
 }
 
-func (s *Service) Unconfirmed(ctx context.Context, postID int64) ([]UserSummary, error) {
+func (s *Service) Unconfirmed(ctx context.Context, postID, userID int64) ([]UserSummary, error) {
+	allowed, err := s.repository.CanViewStatus(ctx, postID, userID)
+	if err != nil || !allowed {
+		return nil, ErrForbidden
+	}
 	return s.repository.Unconfirmed(ctx, postID)
 }

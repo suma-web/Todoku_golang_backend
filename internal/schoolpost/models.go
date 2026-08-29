@@ -16,10 +16,13 @@ type Post struct {
 }
 
 type Status struct {
-	TargetCount      int `json:"target_count"`
-	ReadCount        int `json:"read_count"`
-	ConfirmedCount   int `json:"confirmed_count"`
-	UnconfirmedCount int `json:"unconfirmed_count"`
+	TargetCount      int           `json:"target_count"`
+	ReadCount        int           `json:"read_count"`
+	ConfirmedCount   int           `json:"confirmed_count"`
+	UnconfirmedCount int           `json:"unconfirmed_count"`
+	ConfirmedUsers   []UserSummary `json:"confirmed_users"`
+	ReadOnlyUsers    []UserSummary `json:"read_only_users"`
+	UnreadUsers      []UserSummary `json:"unread_users"`
 }
 
 type UserSummary struct {

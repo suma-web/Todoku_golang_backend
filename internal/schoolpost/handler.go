@@ -128,7 +128,11 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 		bad(w, http.StatusBadRequest, "IDが不正です")
 		return
 	}
-	item, err := h.service.Status(r.Context(), id)
+	item, err := h.service.Status(r.Context(), id, currentUserID(r))
+	if errors.Is(err, ErrForbidden) {
+		bad(w, http.StatusForbidden, "確認状況は連絡作成者または管理者だけが閲覧できます")
+		return
+	}
 	if err != nil {
 		bad(w, http.StatusInternalServerError, "確認状況を取得できませんでした")
 		return
@@ -142,7 +146,11 @@ func (h *Handler) Unconfirmed(w http.ResponseWriter, r *http.Request) {
 		bad(w, http.StatusBadRequest, "IDが不正です")
 		return
 	}
-	items, err := h.service.Unconfirmed(r.Context(), id)
+	items, err := h.service.Unconfirmed(r.Context(), id, currentUserID(r))
+	if errors.Is(err, ErrForbidden) {
+		bad(w, http.StatusForbidden, "確認状況は連絡作成者または管理者だけが閲覧できます")
+		return
+	}
 	if err != nil {
 		bad(w, http.StatusInternalServerError, "未確認者を取得できませんでした")
 		return
