@@ -276,13 +276,13 @@ func (h *Handler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	created, err := h.repository.CreateSchoolUser(r.Context(), request.Name, request.Email, string(hash), request.Role)
 	if err != nil {
 		if isUniqueViolation(err) {
-			writeError(w, 409, "EMAIL_ALREADY_EXISTS", "登録済みのメールアドレスです")
+			writeError(w, 409, "USER_ALREADY_EXISTS", "登録済みのユーザー名またはメールアドレスです")
 			return
 		}
 		writeError(w, 500, "INTERNAL_ERROR", "ユーザーを作成できませんでした")
 		return
 	}
-	writeJSON(w, http.StatusCreated, CurrentUserResponse{ID: created.ID, Name: created.Name, Role: created.Role, IsActive: created.IsActive, CreatedAt: created.CreatedAt.Format(time.RFC3339)})
+	writeJSON(w, http.StatusCreated, CurrentUserResponse{ID: created.ID, Name: created.Name, Email: created.Email, Role: created.Role, IsActive: created.IsActive, CreatedAt: created.CreatedAt.Format(time.RFC3339)})
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
