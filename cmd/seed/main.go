@@ -32,6 +32,7 @@ type demoPost struct {
 	Key, Author, Title, Content, Priority string
 	Groups                                []string
 	CreatedAt                             time.Time
+	ExpiresAt                             *time.Time
 }
 
 type demoQuestion struct {
@@ -77,6 +78,9 @@ var posts = []demoPost{
 	{Key: "soccer", Author: "suzuki", Title: "土曜日の練習時間変更", Content: "土曜日の練習開始時刻を9:00から10:00へ変更します。", Priority: "important", Groups: []string{"サッカー部"}, CreatedAt: mustTime("2026-08-27T09:00:00+09:00")},
 	// Search fixture: the requested career notice does not contain the word 奨学金.
 	{Key: "scholarship", Author: "sato", Title: "奨学金説明会のお知らせ", Content: "進路指導部から、奨学金制度と申請方法を説明します。", Priority: "normal", Groups: []string{"2年"}, CreatedAt: mustTime("2026-08-24T09:00:00+09:00")},
+	{Key: "old-half-year", Author: "tanaka", Title: "昨年度の数学補習について", Content: "昨年度に実施した数学補習の案内です。現在の予定とは異なる可能性があります。", Priority: "normal", Groups: []string{"2年A組"}, CreatedAt: mustTime("2025-12-01T09:00:00+09:00")},
+	{Key: "old-one-year", Author: "sato", Title: "昨年度の進路説明会資料", Content: "昨年度の進路説明会で配布した資料についてのお知らせです。", Priority: "normal", Groups: []string{"2年"}, CreatedAt: mustTime("2025-05-01T09:00:00+09:00")},
+	{Key: "expired", Author: "tanaka", Title: "期限切れデモ連絡", Content: "有効期限を過ぎると通常ユーザーには表示されないことを確認するデモ連絡です。", Priority: "normal", Groups: []string{"2年A組"}, CreatedAt: mustTime("2026-07-01T09:00:00+09:00"), ExpiresAt: timePointer("2026-08-15T18:00:00+09:00")},
 }
 
 var questions = []demoQuestion{
@@ -213,8 +217,8 @@ func seedCategories(ctx context.Context, tx *sql.Tx, groupIDs map[string]int64) 
 	ids := map[string]int64{}
 	for category, group := range categoryGroups {
 		var id int64
-		err := tx.QueryRowContext(ctx, `INSERT INTO question_categories(name,group_id) VALUES($1,$2)
-			ON CONFLICT(name) DO UPDATE SET group_id=EXCLUDED.group_id RETURNING id`, category, groupIDs[group]).Scan(&id)
+		err := tx.QueryRowContext(ctx, `INSERT INTO question_categories(name,group_id,is_active) VALUES($1,$2,TRUE)
+			ON CONFLICT(name) DO UPDATE SET group_id=EXCLUDED.group_id,is_active=TRUE RETURNING id`, category, groupIDs[group]).Scan(&id)
 		if err != nil {
 			return nil, fmt.Errorf("seed category %s: %w", category, err)
 		}
@@ -229,9 +233,9 @@ func seedPosts(ctx context.Context, tx *sql.Tx, userIDs, groupIDs map[string]int
 		var id int64
 		err := tx.QueryRowContext(ctx, `SELECT p.id FROM school_posts p WHERE p.author_id=$1 AND p.title=$2 ORDER BY p.id LIMIT 1`, userIDs[post.Author], post.Title).Scan(&id)
 		if errors.Is(err, sql.ErrNoRows) {
-			err = tx.QueryRowContext(ctx, `INSERT INTO school_posts(author_id,type,title,content,priority,created_at,updated_at) VALUES($1,'notice',$2,$3,$4,$5,$5) RETURNING id`, userIDs[post.Author], post.Title, post.Content, post.Priority, post.CreatedAt).Scan(&id)
+			err = tx.QueryRowContext(ctx, `INSERT INTO school_posts(author_id,type,title,content,priority,created_at,updated_at,expires_at) VALUES($1,'notice',$2,$3,$4,$5,$5,$6) RETURNING id`, userIDs[post.Author], post.Title, post.Content, post.Priority, post.CreatedAt, post.ExpiresAt).Scan(&id)
 		} else if err == nil {
-			_, err = tx.ExecContext(ctx, `UPDATE school_posts SET author_id=$2,type='notice',content=$3,priority=$4,expires_at=NULL,created_at=$5,updated_at=$5 WHERE id=$1`, id, userIDs[post.Author], post.Content, post.Priority, post.CreatedAt)
+			_, err = tx.ExecContext(ctx, `UPDATE school_posts SET author_id=$2,type='notice',content=$3,priority=$4,expires_at=$6,created_at=$5,updated_at=$5 WHERE id=$1`, id, userIDs[post.Author], post.Content, post.Priority, post.CreatedAt, post.ExpiresAt)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("seed post %s: %w", post.Key, err)
@@ -384,4 +388,9 @@ func mustTime(value string) time.Time {
 		panic(err)
 	}
 	return parsed
+}
+
+func timePointer(value string) *time.Time {
+	parsed := mustTime(value)
+	return &parsed
 }

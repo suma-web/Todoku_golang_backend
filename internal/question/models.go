@@ -7,6 +7,7 @@ type Category struct {
 	Name      string `json:"name"`
 	GroupID   int64  `json:"group_id"`
 	GroupName string `json:"group_name"`
+	IsActive  bool   `json:"is_active"`
 }
 
 type Answer struct {

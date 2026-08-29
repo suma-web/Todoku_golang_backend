@@ -47,7 +47,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.Create(r.Context(), currentUserID(r), input)
 	switch {
 	case errors.Is(err, ErrValidation):
-		bad(w, http.StatusBadRequest, "タイトル、本文、対象所属は必須です")
+		bad(w, http.StatusBadRequest, "タイトル、本文、対象所属を入力し、有効期限は現在から2年以内で指定してください")
 	case err != nil:
 		bad(w, http.StatusBadRequest, "投稿内容が不正です")
 	default:
