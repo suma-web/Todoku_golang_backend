@@ -13,6 +13,7 @@ type Repository interface {
 	IsTarget(context.Context, int64, int64) (bool, error)
 	MarkRead(context.Context, int64, int64) error
 	MarkConfirmed(context.Context, int64, int64) error
+	CanViewStatus(context.Context, int64, int64) (bool, error)
 	Status(context.Context, int64) (Status, error)
 	Unconfirmed(context.Context, int64) ([]UserSummary, error)
 }
@@ -109,13 +110,63 @@ func (r *SQLRepository) MarkConfirmed(ctx context.Context, postID, userID int64)
 	return err
 }
 
+func (r *SQLRepository) CanViewStatus(ctx context.Context, postID, userID int64) (bool, error) {
+	var allowed bool
+	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(
+		SELECT 1 FROM school_posts p JOIN users viewer ON viewer.id=$2
+		WHERE p.id=$1 AND (p.author_id=$2 OR viewer.role='admin')
+	)`, postID, userID).Scan(&allowed)
+	return allowed, err
+}
+
 func (r *SQLRepository) Status(ctx context.Context, postID int64) (Status, error) {
 	var item Status
 	err := r.db.QueryRowContext(ctx, `WITH targets AS(SELECT DISTINCT ug.user_id FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=$1) SELECT COUNT(*),COUNT(s.read_at),COUNT(s.confirmed_at) FROM targets t LEFT JOIN school_post_statuses s ON s.post_id=$1 AND s.user_id=t.user_id`, postID).Scan(
 		&item.TargetCount, &item.ReadCount, &item.ConfirmedCount,
 	)
 	item.UnconfirmedCount = item.TargetCount - item.ConfirmedCount
+	if err != nil {
+		return item, err
+	}
+	item.ConfirmedUsers, err = r.statusUsers(ctx, postID, "confirmed")
+	if err != nil {
+		return item, err
+	}
+	item.ReadOnlyUsers, err = r.statusUsers(ctx, postID, "read_only")
+	if err != nil {
+		return item, err
+	}
+	item.UnreadUsers, err = r.statusUsers(ctx, postID, "unread")
 	return item, err
+}
+
+func (r *SQLRepository) statusUsers(ctx context.Context, postID int64, state string) ([]UserSummary, error) {
+	condition := "s.confirmed_at IS NOT NULL"
+	switch state {
+	case "read_only":
+		condition = "s.read_at IS NOT NULL AND s.confirmed_at IS NULL"
+	case "unread":
+		condition = "s.read_at IS NULL"
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT u.id,u.name
+		FROM school_post_groups pg
+		JOIN user_school_groups ug ON ug.group_id=pg.group_id
+		JOIN users u ON u.id=ug.user_id
+		LEFT JOIN school_post_statuses s ON s.post_id=pg.post_id AND s.user_id=u.id
+		WHERE pg.post_id=$1 AND `+condition+` ORDER BY u.name`, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserSummary{}
+	for rows.Next() {
+		var item UserSummary
+		if err := rows.Scan(&item.ID, &item.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 func (r *SQLRepository) Unconfirmed(ctx context.Context, postID int64) ([]UserSummary, error) {

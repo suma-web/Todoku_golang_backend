@@ -336,7 +336,8 @@ func verifyStatuses(ctx context.Context, db *sql.DB) error {
 		if err != nil {
 			return fmt.Errorf("verify status %s: %w", title, err)
 		}
-		if got != want {
+		if got.TargetCount != want.TargetCount || got.ReadCount != want.ReadCount ||
+			got.ConfirmedCount != want.ConfirmedCount || got.UnconfirmedCount != want.UnconfirmedCount {
 			return fmt.Errorf("verify status %s: got %+v, want %+v", title, got, want)
 		}
 	}
