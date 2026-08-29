@@ -26,7 +26,7 @@ func (r *SQLRepository) Search(ctx context.Context, userID int64, query string) 
 		 AND EXISTS(SELECT 1 FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=p.id AND ug.user_id=$1)
 		 UNION ALL
 		 SELECT 'question',q.id,q.title,LEFT(q.content,200),c.name,g.name,q.updated_at FROM questions q JOIN question_categories c ON c.id=q.category_id JOIN school_groups g ON g.id=c.group_id
-		 WHERE q.visibility='public' AND(q.title ILIKE $2 OR q.content ILIKE $2 OR EXISTS(SELECT 1 FROM question_answers a WHERE a.question_id=q.id AND a.content ILIKE $2))
+		 WHERE q.visibility='public' AND(q.title ILIKE $2 OR q.content ILIKE $2 OR c.name ILIKE $2 OR g.name ILIKE $2 OR EXISTS(SELECT 1 FROM question_answers a WHERE a.question_id=q.id AND a.content ILIKE $2))
 		 UNION ALL
 		 SELECT 'contact',c.id,c.name,'質問カテゴリの担当窓口',c.name,g.name,c.created_at FROM question_categories c JOIN school_groups g ON g.id=c.group_id WHERE c.name ILIKE $2 OR g.name ILIKE $2
 		) results ORDER BY sort_at DESC LIMIT 100`, userID, pattern)

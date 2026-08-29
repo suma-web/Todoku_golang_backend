@@ -110,6 +110,17 @@ go vet ./...
 go test ./...
 ```
 
+## デモデータ
+
+管理者によるアカウント発行、所属配信、質問ルーティング、private相談、既読・確認、横断検索を一連で確認できる開発用seedを用意しています。通常起動では自動投入されません。
+
+```bash
+docker compose up -d postgres
+docker compose run --rm -e DEMO_SEED=true backend go run ./cmd/seed
+```
+
+アカウント情報、作成データ、期待するアクセス範囲、操作シナリオは[デモデータと確認手順](docs/DEMO.md)を参照してください。
+
 ## 学校機能の責務分離
 
 `question`、`schoolpost`、`search`は、次の依存方向で構成しています。
@@ -132,6 +143,7 @@ ServiceはRepositoryインターフェースへ依存するため、PostgreSQL�
 ```text
 .
 ├── cmd/api/main.go          # APIサーバーとルーティング
+├── cmd/seed/main.go         # 明示実行する開発用デモデータ
 ├── internal/
 │   ├── auth/                # 認証・Role認可
 │   ├── comment/             # 投稿へのコメント
@@ -145,6 +157,7 @@ ServiceはRepositoryインターフェースへ依存するため、PostgreSQL�
 │   ├── search/              # 権限を考慮した横断検索
 │   └── user/                # ユーザー・認証
 ├── migrations/              # データベース定義
+├── docs/DEMO.md             # デモアカウントと確認手順
 ├── Dockerfile
 └── compose.yml
 ```
