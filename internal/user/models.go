@@ -50,6 +50,7 @@ type LoginResponse struct {
 type CurrentUserResponse struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
+	Email     string `json:"email,omitempty"`
 	Bio       string `json:"bio"`
 	Location  string `json:"location"`
 	Website   string `json:"website"`
