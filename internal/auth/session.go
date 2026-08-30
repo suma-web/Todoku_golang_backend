@@ -17,19 +17,27 @@ const cookieName = "session"
 type userIDKey struct{}
 type roleKey struct{}
 
-func SetSessionCookie(w http.ResponseWriter, userID int64, secret string) {
+func SetSessionCookie(w http.ResponseWriter, userID int64, secret string, secure bool) {
 	payload := strconv.FormatInt(userID, 10)
 	token := payload + "." + sign(payload, secret)
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName, Value: token, Path: "/", HttpOnly: true,
-		SameSite: http.SameSiteLaxMode, MaxAge: int((7 * 24 * time.Hour).Seconds()),
+		SameSite: sameSite, Secure: secure, MaxAge: int((7 * 24 * time.Hour).Seconds()),
 	})
 }
 
-func ClearSessionCookie(w http.ResponseWriter) {
+func ClearSessionCookie(w http.ResponseWriter, secure bool) {
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName, Value: "", Path: "/", HttpOnly: true,
-		SameSite: http.SameSiteLaxMode, MaxAge: -1, Expires: time.Unix(0, 0),
+		SameSite: sameSite, Secure: secure, MaxAge: -1, Expires: time.Unix(0, 0),
 	})
 }
 

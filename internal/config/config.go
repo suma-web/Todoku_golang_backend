@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -11,6 +12,7 @@ type Config struct {
 	DatabaseURL   string
 	FrontendURL   string
 	SessionSecret string
+	CookieSecure  bool
 }
 
 func Load() (Config, error) {
@@ -19,11 +21,17 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	cookieSecure, err := strconv.ParseBool(getEnv("COOKIE_SECURE", "false"))
+	if err != nil {
+		return Config{}, fmt.Errorf("COOKIE_SECURE must be true or false")
+	}
+
 	cfg := Config{
 		Port:          getEnv("PORT", "8080"),
 		DatabaseURL:   databaseURL,
 		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:5173"),
 		SessionSecret: os.Getenv("SESSION_SECRET"),
+		CookieSecure:  cookieSecure,
 	}
 
 	if len(cfg.SessionSecret) < 32 {

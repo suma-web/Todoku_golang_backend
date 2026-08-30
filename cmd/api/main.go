@@ -38,7 +38,7 @@ func main() {
 	}
 
 	userRepository := user.NewRepository(db)
-	userHandler := user.NewHandler(userRepository, cfg.SessionSecret)
+	userHandler := user.NewHandler(userRepository, cfg.SessionSecret, cfg.CookieSecure)
 	schoolGroupHandler := schoolgroup.NewHandler(db)
 	schoolPostRepository := schoolpost.NewRepository(db)
 	schoolPostService := schoolpost.NewService(schoolPostRepository)
