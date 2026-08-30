@@ -18,10 +18,11 @@ import (
 type Handler struct {
 	repository    *Repository
 	sessionSecret string
+	cookieSecure  bool
 }
 
-func NewHandler(repository *Repository, sessionSecret string) *Handler {
-	return &Handler{repository: repository, sessionSecret: sessionSecret}
+func NewHandler(repository *Repository, sessionSecret string, cookieSecure bool) *Handler {
+	return &Handler{repository: repository, sessionSecret: sessionSecret, cookieSecure: cookieSecure}
 }
 
 type errorBody struct {
@@ -89,7 +90,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth.SetSessionCookie(w, foundUser.ID, h.sessionSecret)
+	auth.SetSessionCookie(w, foundUser.ID, h.sessionSecret, h.cookieSecure)
 
 	response := LoginResponse{
 		ID:        foundUser.ID,
@@ -104,7 +105,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	auth.ClearSessionCookie(w)
+	auth.ClearSessionCookie(w, h.cookieSecure)
 	w.WriteHeader(http.StatusNoContent)
 }
 
