@@ -15,7 +15,7 @@ docker compose run --rm -e DEMO_SEED=true backend go run ./cmd/seed
 
 ```bash
 DEMO_SEED=true \
-DATABASE_URL='postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable' \
+DATABASE_URL='postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable' \
 go run ./cmd/seed
 ```
 

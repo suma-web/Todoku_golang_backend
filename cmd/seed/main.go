@@ -18,7 +18,7 @@ import (
 	schoolsearch "twitter_golang_backend/internal/search"
 )
 
-const defaultDevelopmentDatabaseURL = "postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable"
+const defaultDevelopmentDatabaseURL = "postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable"
 
 type demoUser struct {
 	Key, Name, Email, Password, Role string
