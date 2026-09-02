@@ -78,12 +78,12 @@ docker compose up --build
 | --- | --- |
 | Host | ローカル：`localhost` / Docker内：`postgres` |
 | Port | `5432` |
-| Database | `twitter` |
-| User | `twitter` |
-| Password | `twitter_password` |
+| Database | `todoku` |
+| User | `todoku_user` |
+| Password | `todoku_password` |
 
 ```text
-postgres://twitter:twitter_password@localhost:5432/twitter?sslmode=disable
+postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable
 ```
 
 ## 主なAPI

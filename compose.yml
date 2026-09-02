@@ -1,18 +1,18 @@
 services:
   postgres:
     image: postgres:16
-    container_name: twitter_postgres
+    container_name: todoku_postgres
     environment:
-      POSTGRES_USER: twitter
-      POSTGRES_PASSWORD: twitter_password
-      POSTGRES_DB: twitter
+      POSTGRES_USER: todoku_user
+      POSTGRES_PASSWORD: todoku_password
+      POSTGRES_DB: todoku
     ports:
       - "5432:5432"
     volumes:
-      - twitter_postgres_data:/var/lib/postgresql/data
+      - todoku_postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U twitter -d twitter"]
+      test: ["CMD-SHELL", "pg_isready -U todoku_user -d todoku"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,20 +21,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: twitter_go_backend
+    container_name: todoku_go_backend
     ports:
       - "8080:8080"
     environment:
       PORT: "8080"
-      DATABASE_URL: "postgres://twitter:twitter_password@postgres:5432/twitter?sslmode=disable"
+      DATABASE_URL: "postgres://todoku_user:todoku_password@postgres:5432/todoku?sslmode=disable"
       FRONTEND_URL: "http://localhost:5173"
       SESSION_SECRET: "development-session-secret-change-me"
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - .:/app
-    command: go run ./cmd/api
 
 volumes:
-  twitter_postgres_data:
+  todoku_postgres_data:

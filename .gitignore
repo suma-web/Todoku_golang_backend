@@ -1,2 +1,4 @@
 .env
 uploads/
+.DS_Store
+load-test/users.json
