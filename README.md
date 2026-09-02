@@ -123,7 +123,7 @@ docker compose run --rm -e DEMO_SEED=true backend go run ./cmd/seed
 
 ## 学校機能の責務分離
 
-`question`、`schoolpost`、`search`は、次の依存方向で構成しています。
+`schooladmin`、`schoolgroup`、`schoolpost`、`question`、`search`は、次の依存方向で構成しています。
 
 ```text
 Handler → Service → Repository → PostgreSQL

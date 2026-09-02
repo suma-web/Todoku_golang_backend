@@ -54,15 +54,16 @@ func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item, err := h.service.CreateCategory(r.Context(), input)
-	if errors.Is(err, ErrValidation) {
+	switch {
+	case errors.Is(err, ErrValidation):
 		failure(w, http.StatusBadRequest, "VALIDATION_ERROR", "カテゴリ名と担当部署を指定してください")
-		return
-	}
-	if err != nil {
+	case errors.Is(err, ErrConflict):
 		failure(w, http.StatusConflict, "CATEGORY_EXISTS", "カテゴリを作成できませんでした")
-		return
+	case err != nil:
+		failure(w, http.StatusInternalServerError, "INTERNAL_ERROR", "カテゴリを作成できませんでした")
+	default:
+		output(w, http.StatusCreated, item)
 	}
-	output(w, http.StatusCreated, item)
 }
 
 func (h *Handler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
@@ -78,15 +79,18 @@ func (h *Handler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 	input.ID = id
 	item, err := h.service.UpdateCategory(r.Context(), input)
-	if errors.Is(err, ErrValidation) {
+	switch {
+	case errors.Is(err, ErrValidation):
 		failure(w, http.StatusBadRequest, "VALIDATION_ERROR", "カテゴリ名と担当部署を指定してください")
-		return
-	}
-	if err != nil {
+	case errors.Is(err, ErrNotFound):
+		failure(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", "カテゴリが見つかりません")
+	case errors.Is(err, ErrConflict):
 		failure(w, http.StatusConflict, "CATEGORY_UPDATE_FAILED", "カテゴリを更新できませんでした")
-		return
+	case err != nil:
+		failure(w, http.StatusInternalServerError, "INTERNAL_ERROR", "カテゴリを更新できませんでした")
+	default:
+		output(w, http.StatusOK, item)
 	}
-	output(w, http.StatusOK, item)
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {

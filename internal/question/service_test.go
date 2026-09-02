@@ -2,19 +2,33 @@ package question
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 )
 
 type questionRepositoryStub struct {
 	Repository
-	created Question
+	created       Question
+	categoryError error
+}
+
+func (s *questionRepositoryStub) UpdateCategory(_ context.Context, input Category) (Category, error) {
+	return input, s.categoryError
 }
 
 func (s *questionRepositoryStub) Create(_ context.Context, userID int64, input Question) (Question, error) {
 	input.UserID = userID
 	s.created = input
 	return input, nil
+}
+
+func TestUpdateCategoryReturnsNotFoundSeparately(t *testing.T) {
+	service := NewService(&questionRepositoryStub{categoryError: sql.ErrNoRows})
+	_, err := service.UpdateCategory(context.Background(), Category{ID: 99, Name: "数学", GroupID: 1})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpdateCategory() error = %v, want ErrNotFound", err)
+	}
 }
 
 func TestServiceCreateValidatesAndNormalizesInput(t *testing.T) {
