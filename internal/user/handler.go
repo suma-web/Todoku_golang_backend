@@ -92,13 +92,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	auth.SetSessionCookie(w, foundUser.ID, h.sessionSecret, h.cookieSecure)
 
-	response := LoginResponse{
+	response := CurrentUserResponse{
 		ID:        foundUser.ID,
 		Name:      foundUser.Name,
 		Email:     foundUser.Email,
-		Birthday:  foundUser.Birthday.Format("2006-01-02"),
 		CreatedAt: foundUser.CreatedAt.Format(time.RFC3339),
 		Role:      foundUser.Role,
+		IsActive:  foundUser.IsActive,
 	}
 
 	writeJSON(w, http.StatusOK, response)
@@ -131,8 +131,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, CurrentUserResponse{
-		ID: foundUser.ID, Name: foundUser.Name, Bio: foundUser.Bio,
-		Location: foundUser.Location, Website: foundUser.Website,
+		ID: foundUser.ID, Name: foundUser.Name, Email: foundUser.Email,
 		CreatedAt: foundUser.CreatedAt.Format(time.RFC3339),
 		Role:      foundUser.Role, IsActive: foundUser.IsActive,
 	})

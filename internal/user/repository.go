@@ -20,7 +20,7 @@ func (r *Repository) FindByEmail(
 	email string,
 ) (User, error) {
 	const query = `
-			SELECT id, name, email, birthday, password_hash, created_at, role, is_active
+			SELECT id, name, email, password_hash, created_at, role, is_active
 		FROM users
 		WHERE LOWER(email) = LOWER($1)
 	`
@@ -31,7 +31,6 @@ func (r *Repository) FindByEmail(
 		&foundUser.ID,
 		&foundUser.Name,
 		&foundUser.Email,
-		&foundUser.Birthday,
 		&foundUser.PasswordHash,
 		&foundUser.CreatedAt,
 		&foundUser.Role,
@@ -50,7 +49,7 @@ func (r *Repository) FindByEmail(
 
 func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
 	const query = `
-			SELECT id, name, email, birthday, created_at, bio, location, website, role, is_active
+			SELECT id, name, email, created_at, role, is_active
 		FROM users
 		WHERE id = $1
 	`
@@ -60,11 +59,7 @@ func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
 		&foundUser.ID,
 		&foundUser.Name,
 		&foundUser.Email,
-		&foundUser.Birthday,
 		&foundUser.CreatedAt,
-		&foundUser.Bio,
-		&foundUser.Location,
-		&foundUser.Website,
 		&foundUser.Role,
 		&foundUser.IsActive,
 	)
@@ -76,12 +71,12 @@ func (r *Repository) FindByID(ctx context.Context, userID int64) (User, error) {
 }
 
 func (r *Repository) CreateSchoolUser(ctx context.Context, name, email, passwordHash, role string) (User, error) {
-	const query = `INSERT INTO users (name,email,birthday,password_hash,role)
-		VALUES ($1,$2,DATE '2000-01-01',$3,$4)
-		RETURNING id,name,email,birthday,created_at,role,is_active`
+	const query = `INSERT INTO users (name,email,password_hash,role)
+		VALUES ($1,$2,$3,$4)
+		RETURNING id,name,email,created_at,role,is_active`
 	var created User
 	err := r.db.QueryRowContext(ctx, query, name, email, passwordHash, role).Scan(
-		&created.ID, &created.Name, &created.Email, &created.Birthday,
-		&created.CreatedAt, &created.Role, &created.IsActive)
+		&created.ID, &created.Name, &created.Email, &created.CreatedAt,
+		&created.Role, &created.IsActive)
 	return created, err
 }

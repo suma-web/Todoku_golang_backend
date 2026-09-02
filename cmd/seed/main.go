@@ -171,8 +171,8 @@ func seedUsers(ctx context.Context, tx *sql.Tx) (map[string]int64, error) {
 			return nil, err
 		}
 		var id int64
-		err = tx.QueryRowContext(ctx, `INSERT INTO users(name,email,birthday,password_hash,role,is_active)
-			VALUES($1,$2,DATE '2000-01-01',$3,$4,TRUE)
+		err = tx.QueryRowContext(ctx, `INSERT INTO users(name,email,password_hash,role,is_active)
+			VALUES($1,$2,$3,$4,TRUE)
 			ON CONFLICT(email) DO UPDATE SET name=EXCLUDED.name,password_hash=EXCLUDED.password_hash,role=EXCLUDED.role,is_active=TRUE,updated_at=NOW()
 			RETURNING id`, user.Name, user.Email, string(hash), user.Role).Scan(&id)
 		if err != nil {
