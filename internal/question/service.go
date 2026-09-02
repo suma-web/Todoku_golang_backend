@@ -2,8 +2,11 @@ package question
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
@@ -32,7 +35,7 @@ func (s *Service) CreateCategory(ctx context.Context, input Category) (Category,
 	}
 	item, err := s.repository.CreateCategory(ctx, input)
 	if err != nil {
-		return Category{}, ErrConflict
+		return Category{}, classifyCategoryError(err)
 	}
 	return item, nil
 }
@@ -44,9 +47,28 @@ func (s *Service) UpdateCategory(ctx context.Context, input Category) (Category,
 	}
 	item, err := s.repository.UpdateCategory(ctx, input)
 	if err != nil {
-		return Category{}, ErrConflict
+		return Category{}, classifyCategoryError(err)
 	}
 	return item, nil
+}
+
+func classifyCategoryError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23503":
+			return ErrValidation
+		case "23505":
+			return ErrConflict
+		}
+	}
+	return err
 }
 
 func (s *Service) Create(ctx context.Context, userID int64, input Question) (Question, error) {

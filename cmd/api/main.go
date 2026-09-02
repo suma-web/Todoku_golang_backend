@@ -39,7 +39,9 @@ func main() {
 
 	userRepository := user.NewRepository(db)
 	userHandler := user.NewHandler(userRepository, cfg.SessionSecret, cfg.CookieSecure)
-	schoolGroupHandler := schoolgroup.NewHandler(db)
+	schoolGroupRepository := schoolgroup.NewRepository(db)
+	schoolGroupService := schoolgroup.NewService(schoolGroupRepository)
+	schoolGroupHandler := schoolgroup.NewHandler(schoolGroupService)
 	schoolPostRepository := schoolpost.NewRepository(db)
 	schoolPostService := schoolpost.NewService(schoolPostRepository)
 	schoolPostHandler := schoolpost.NewHandler(schoolPostService)
@@ -49,7 +51,9 @@ func main() {
 	searchRepository := search.NewRepository(db)
 	searchService := search.NewService(searchRepository)
 	searchHandler := search.NewHandler(searchService)
-	schoolAdminHandler := schooladmin.NewHandler(db)
+	schoolAdminRepository := schooladmin.NewRepository(db)
+	schoolAdminService := schooladmin.NewService(schoolAdminRepository)
+	schoolAdminHandler := schooladmin.NewHandler(schoolAdminService)
 
 	router := chi.NewRouter()
 
