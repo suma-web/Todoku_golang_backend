@@ -30,6 +30,8 @@ func TestServiceCreateValidatesAndNormalizesInput(t *testing.T) {
 	item, err := service.Create(context.Background(), 3, Post{
 		Title:    "  校内連絡  ",
 		Content:  "  本文  ",
+		Type:     "notice",
+		Priority: "normal",
 		GroupIDs: []int64{1},
 	})
 	if err != nil {
@@ -42,7 +44,7 @@ func TestServiceCreateValidatesAndNormalizesInput(t *testing.T) {
 
 func TestServiceCreateRequiresTargetGroup(t *testing.T) {
 	service := NewService(&schoolPostRepositoryStub{})
-	_, err := service.Create(context.Background(), 3, Post{Title: "連絡", Content: "本文"})
+	_, err := service.Create(context.Background(), 3, Post{Title: "連絡", Content: "本文", Type: "notice", Priority: "normal"})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("Create() error = %v, want ErrValidation", err)
 	}
@@ -51,7 +53,7 @@ func TestServiceCreateRequiresTargetGroup(t *testing.T) {
 func TestServiceCreateRejectsPastOrOverTwoYearExpiration(t *testing.T) {
 	service := NewService(&schoolPostRepositoryStub{})
 	for _, expiresAt := range []time.Time{time.Now().Add(-time.Hour), time.Now().AddDate(2, 0, 1)} {
-		_, err := service.Create(context.Background(), 3, Post{Title: "連絡", Content: "本文", GroupIDs: []int64{1}, ExpiresAt: &expiresAt})
+		_, err := service.Create(context.Background(), 3, Post{Title: "連絡", Content: "本文", Type: "notice", Priority: "normal", GroupIDs: []int64{1}, ExpiresAt: &expiresAt})
 		if !errors.Is(err, ErrValidation) {
 			t.Fatalf("Create() expiration %v error = %v, want ErrValidation", expiresAt, err)
 		}

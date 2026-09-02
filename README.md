@@ -13,7 +13,7 @@ Twitterクローンで培った認証・API・データベース設計の技術�
 - Classroom、メール、口頭など、情報経路が複数の場所に分散している
 - 生徒が誰に質問すべきか分からない
 - 担当教員が不在のときに質問・相談が止まってしまう
-- 配信した連絡が対象者に読まれ、確認されたか分からない
+- 配信した連絡を対象者の誰が既読にしたか分からない
 
 ## 解決方法
 
@@ -93,7 +93,7 @@ postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable
 | 認証 | `POST /api/login`、`POST /api/logout`、`GET /api/me` |
 | ユーザー管理 | `POST /api/admin/users`、`GET /api/admin/users`、`PATCH /api/admin/users/{id}` |
 | 所属管理 | `GET /api/school-groups`、`POST /api/school-groups` |
-| 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}`、`DELETE /api/school-posts/{id}` |
+| 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}`、`PATCH /api/school-posts/{id}`、`DELETE /api/school-posts/{id}` |
 | 既読状況 | `POST /api/school-posts/{id}/read`、`GET /api/school-posts/{id}/status`、`GET /api/me/school-posts` |
 | 質問・相談 | `GET /api/questions`、`POST /api/questions`、`POST /api/questions/{id}/answers` |
 | 質問カテゴリ管理 | `POST /api/question-categories`、`PATCH /api/question-categories/{id}` |
@@ -112,7 +112,7 @@ go test ./...
 
 ## デモデータ
 
-管理者によるアカウント発行、所属配信、質問ルーティング、private相談、既読・確認、横断検索を一連で確認できる開発用seedを用意しています。通常起動では自動投入されません。
+管理者によるアカウント発行、所属配信、質問ルーティング、private相談、既読、横断検索を一連で確認できる開発用seedを用意しています。通常起動では自動投入されません。
 
 ```bash
 docker compose up -d postgres
