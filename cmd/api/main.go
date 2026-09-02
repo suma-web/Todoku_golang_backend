@@ -99,6 +99,7 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Post("/api/school-posts", schoolPostHandler.Create)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "teacher", "admin")).Get("/api/me/school-posts", schoolPostHandler.Authored)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/school-posts/{id}", schoolPostHandler.Get)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/school-posts/{id}", schoolPostHandler.Update)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Delete("/api/school-posts/{id}", schoolPostHandler.Delete)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/timeline", schoolPostHandler.Timeline)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/school-posts/{id}/read", schoolPostHandler.Read)

@@ -12,6 +12,7 @@ type Post struct {
 	Priority     string        `json:"priority"`
 	ExpiresAt    *time.Time    `json:"expires_at"`
 	CreatedAt    time.Time     `json:"created_at"`
+	UpdatedAt    time.Time     `json:"updated_at"`
 	GroupIDs     []int64       `json:"group_ids"`
 	TargetedByMe bool          `json:"targeted_by_me"`
 	ReadByMe     bool          `json:"read_by_me"`

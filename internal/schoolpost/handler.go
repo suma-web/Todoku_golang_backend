@@ -69,6 +69,30 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	out(w, http.StatusOK, item)
 }
 
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := postID(r)
+	if err != nil {
+		bad(w, http.StatusBadRequest, "IDが不正です")
+		return
+	}
+	var input Post
+	if json.NewDecoder(r.Body).Decode(&input) != nil {
+		bad(w, http.StatusBadRequest, "入力が不正です")
+		return
+	}
+	item, err := h.service.Update(r.Context(), id, currentUserID(r), input)
+	switch {
+	case errors.Is(err, ErrValidation):
+		bad(w, http.StatusBadRequest, "タイトル、本文、対象所属を入力し、有効期限は現在から2年以内で指定してください")
+	case errors.Is(err, ErrNotFound):
+		bad(w, http.StatusNotFound, "投稿が見つからないか編集権限がありません")
+	case err != nil:
+		bad(w, http.StatusInternalServerError, "編集できませんでした")
+	default:
+		out(w, http.StatusOK, item)
+	}
+}
+
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := postID(r)
 	if err != nil {

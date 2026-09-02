@@ -22,18 +22,52 @@ func NewService(repository Repository) *Service {
 }
 
 func (s *Service) Create(ctx context.Context, authorID int64, input Post) (Post, error) {
+	input, err := validatePost(input)
+	if err != nil {
+		return Post{}, err
+	}
+	return s.repository.Create(ctx, authorID, input)
+}
+
+func (s *Service) Update(ctx context.Context, postID, userID int64, input Post) (Post, error) {
+	input, err := validatePost(input)
+	if err != nil {
+		return Post{}, err
+	}
+	item, err := s.repository.Update(ctx, postID, userID, input)
+	if err != nil {
+		return Post{}, ErrNotFound
+	}
+	return item, nil
+}
+
+func validatePost(input Post) (Post, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.Content = strings.TrimSpace(input.Content)
-	if input.Title == "" || input.Content == "" || len(input.GroupIDs) == 0 {
+	if input.Title == "" || input.Content == "" || len(input.GroupIDs) == 0 ||
+		(input.Type != "notice" && input.Type != "emergency") ||
+		(input.Priority != "normal" && input.Priority != "important" && input.Priority != "urgent") {
 		return Post{}, ErrValidation
 	}
+	seen := map[int64]bool{}
+	groupIDs := make([]int64, 0, len(input.GroupIDs))
+	for _, id := range input.GroupIDs {
+		if id < 1 {
+			return Post{}, ErrValidation
+		}
+		if !seen[id] {
+			seen[id] = true
+			groupIDs = append(groupIDs, id)
+		}
+	}
+	input.GroupIDs = groupIDs
 	if input.ExpiresAt != nil {
 		now := time.Now()
 		if !input.ExpiresAt.After(now) || input.ExpiresAt.After(now.AddDate(2, 0, 0)) {
 			return Post{}, ErrValidation
 		}
 	}
-	return s.repository.Create(ctx, authorID, input)
+	return input, nil
 }
 
 func (s *Service) Get(ctx context.Context, postID, userID int64) (Post, error) {
