@@ -108,6 +108,18 @@ go vet ./...
 go test ./...
 ```
 
+## AWS添付ストレージ
+
+S3バケットとECSタスクロールは`deploy/aws/attachment-storage.yml`で定義しています。バケットは公開アクセスをすべて拒否し、暗号化とバージョニングを有効にします。
+
+```bash
+aws cloudformation deploy \
+  --stack-name todoku-attachment-storage \
+  --template-file deploy/aws/attachment-storage.yml \
+  --parameter-overrides BucketName=todoku-attachments-ACCOUNT-REGION \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
 ## デモデータ
 
 管理者によるアカウント発行、所属配信、質問ルーティング、private相談、既読、横断検索を一連で確認できる開発用seedを用意しています。通常起動では自動投入されません。
