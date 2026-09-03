@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"twitter_golang_backend/internal/auth"
+	"todoku_golang_backend/internal/auth"
 )
 
 type Handler struct {

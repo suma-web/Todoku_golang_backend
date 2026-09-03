@@ -10,15 +10,15 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
-	"twitter_golang_backend/internal/auth"
-	"twitter_golang_backend/internal/config"
-	"twitter_golang_backend/internal/database"
-	"twitter_golang_backend/internal/question"
-	"twitter_golang_backend/internal/schooladmin"
-	"twitter_golang_backend/internal/schoolgroup"
-	"twitter_golang_backend/internal/schoolpost"
-	"twitter_golang_backend/internal/search"
-	"twitter_golang_backend/internal/user"
+	"todoku_golang_backend/internal/auth"
+	"todoku_golang_backend/internal/config"
+	"todoku_golang_backend/internal/database"
+	"todoku_golang_backend/internal/question"
+	"todoku_golang_backend/internal/schooladmin"
+	"todoku_golang_backend/internal/schoolgroup"
+	"todoku_golang_backend/internal/schoolpost"
+	"todoku_golang_backend/internal/search"
+	"todoku_golang_backend/internal/user"
 )
 
 func main() {

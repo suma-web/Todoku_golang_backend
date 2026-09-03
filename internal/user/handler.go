@@ -12,7 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
-	"twitter_golang_backend/internal/auth"
+	"todoku_golang_backend/internal/auth"
 )
 
 type Handler struct {

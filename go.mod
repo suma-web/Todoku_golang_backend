@@ -1,4 +1,4 @@
-module twitter_golang_backend
+module todoku_golang_backend
 
 go 1.25.0
 

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"twitter_golang_backend/internal/auth"
+	"todoku_golang_backend/internal/auth"
 )
 
 type Handler struct {

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
-	"twitter_golang_backend/internal/database"
-	"twitter_golang_backend/internal/schoolpost"
-	schoolsearch "twitter_golang_backend/internal/search"
+	"todoku_golang_backend/internal/database"
+	"todoku_golang_backend/internal/schoolpost"
+	schoolsearch "todoku_golang_backend/internal/search"
 )
 
 const defaultDevelopmentDatabaseURL = "postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable"
