@@ -75,6 +75,8 @@ func main() {
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
 			cfg.FrontendURL,
+			"https://todoku-service.com",
+			"https://www.todoku-service.com",
 			"http://localhost:*",
 			"http://127.0.0.1:*",
 		},
