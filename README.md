@@ -2,6 +2,8 @@
 
 学校内に分散している連絡・質問・相談を一つに集約し、必要な情報へアクセスしやすくするためのWebアプリケーションのバックエンドAPIです。
 
+[本番環境](https://todoku-service.com) | [フロントエンド](https://github.com/suma-web/Todoku_react_frontend) | [デモ動画](https://github.com/suma-web/Todoku_react_frontend/releases/tag/demo-v1.0) | [AWS構成図](docs/architecture/aws.md) | [ER図](docs/architecture/erd/README.md)
+
 ## 解決したい課題
 
 - Classroom、メール、口頭など、情報経路が複数の場所に分散している
@@ -48,6 +50,9 @@
 - PostgreSQL 16
 - bcrypt
 - Docker / Docker Compose
+- AWS ECS / ECR / RDS / S3 / Secrets Manager / CloudWatch
+
+画面実装、操作方法、スクリーンショットは[フロントエンドリポジトリ](https://github.com/suma-web/Todoku_react_frontend)を参照してください。
 
 ## セットアップ
 
@@ -169,6 +174,7 @@ ServiceはRepositoryインターフェースへ依存するため、PostgreSQL�
 │   └── user/                # ユーザー・認証
 ├── migrations/              # データベース定義
 ├── docs/DEMO.md             # デモアカウントと確認手順
+├── docs/architecture/aws.md # AWS構成図
 ├── docs/architecture/erd/   # ER図のソース・SVG・PDF
 ├── scripts/generate-erd.sh  # ER図の再生成
 ├── Dockerfile
