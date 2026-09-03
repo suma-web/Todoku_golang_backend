@@ -29,3 +29,8 @@ jobs:
 
       - name: Show coverage
         run: go tool cover -func=coverage.out
+
+      - name: Enforce coverage floor
+        run: |
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $3); print $3}')
+          awk -v total="$total" 'BEGIN { if (total < 10) exit 1 }'

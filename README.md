@@ -1,5 +1,7 @@
 # 学校内情報・コミュニケーション基盤 Backend
 
+[![Backend CI](https://github.com/suma-web/Todoku_golang_backend/actions/workflows/ci.yml/badge.svg)](https://github.com/suma-web/Todoku_golang_backend/actions/workflows/ci.yml)
+
 学校内に分散している連絡・質問・相談を一つに集約し、必要な情報へアクセスしやすくするためのWebアプリケーションのバックエンドAPIです。
 
 [本番環境](https://todoku-service.com) | [フロントエンド](https://github.com/suma-web/Todoku_react_frontend) | [デモ動画](https://github.com/suma-web/Todoku_react_frontend/releases/tag/demo-v1.0) | [AWS構成図](docs/architecture/aws.md) | [ER図](docs/architecture/erd/README.md)
@@ -110,8 +112,12 @@ postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable
 
 ```bash
 go vet ./...
-go test ./...
+go test ./... -race -coverprofile=coverage.out
 ```
+
+2026年9月4日時点で25テスト、全体ステートメントカバレッジ11.2%、添付パッケージ40.8%です。認証Cookie、Role・閲覧権限、private質問、所属別連絡、添付の形式・件数・容量、認証前のストレージアクセス防止を重点的に検証しています。
+
+テスト対象、期待するリスク、実行結果の詳細は[テスト方針と結果](docs/TESTING.md)を参照してください。CIではrace detectorとカバレッジ下限10%を毎回検証します。
 
 ## データモデル
 
