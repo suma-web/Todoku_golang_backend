@@ -8,11 +8,13 @@ import (
 )
 
 type Config struct {
-	Port          string
-	DatabaseURL   string
-	FrontendURL   string
-	SessionSecret string
-	CookieSecure  bool
+	Port             string
+	DatabaseURL      string
+	FrontendURL      string
+	SessionSecret    string
+	CookieSecure     bool
+	AttachmentBucket string
+	AWSRegion        string
 }
 
 func Load() (Config, error) {
@@ -27,11 +29,13 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		Port:          getEnv("PORT", "8080"),
-		DatabaseURL:   databaseURL,
-		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:5173"),
-		SessionSecret: os.Getenv("SESSION_SECRET"),
-		CookieSecure:  cookieSecure,
+		Port:             getEnv("PORT", "8080"),
+		DatabaseURL:      databaseURL,
+		FrontendURL:      getEnv("FRONTEND_URL", "http://localhost:5173"),
+		SessionSecret:    os.Getenv("SESSION_SECRET"),
+		CookieSecure:     cookieSecure,
+		AttachmentBucket: getEnv("ATTACHMENT_BUCKET", "todoku-attachments-local"),
+		AWSRegion:        getEnv("AWS_REGION", "ap-northeast-1"),
 	}
 
 	if len(cfg.SessionSecret) < 32 {

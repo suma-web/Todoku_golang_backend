@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"todoku_golang_backend/internal/attachment"
 	"todoku_golang_backend/internal/auth"
 	"todoku_golang_backend/internal/config"
 	"todoku_golang_backend/internal/database"
@@ -32,6 +35,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(cfg.AWSRegion))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err := database.Migrate(context.Background(), db, "migrations"); err != nil {
 		log.Fatal(err)
@@ -54,6 +61,8 @@ func main() {
 	schoolAdminRepository := schooladmin.NewRepository(db)
 	schoolAdminService := schooladmin.NewService(schoolAdminRepository)
 	schoolAdminHandler := schooladmin.NewHandler(schoolAdminService)
+	attachmentStorage := attachment.NewS3Storage(s3.NewFromConfig(awsCfg), cfg.AttachmentBucket)
+	attachmentHandler := attachment.NewHandler(attachment.NewService(db, attachmentStorage))
 
 	router := chi.NewRouter()
 
@@ -118,6 +127,13 @@ func main() {
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/questions/{id}/answers", questionHandler.Answer)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Patch("/api/questions/{id}/resolve", questionHandler.Resolve)
 	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/search", searchHandler.Search)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/school-posts/{id}/attachments", attachmentHandler.UploadSchoolPost)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/school-posts/{id}/attachments", attachmentHandler.ListSchoolPost)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/questions/{id}/attachments", attachmentHandler.UploadQuestion)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/questions/{id}/attachments", attachmentHandler.ListQuestion)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Post("/api/answers/{id}/attachments", attachmentHandler.UploadAnswer)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/answers/{id}/attachments", attachmentHandler.ListAnswer)
+	router.With(auth.RequireAuth(cfg.SessionSecret)).Get("/api/attachments/{id}/download", attachmentHandler.Download)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Get("/api/admin/users", schoolAdminHandler.ListUsers)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Patch("/api/admin/users/{id}", schoolAdminHandler.UpdateUser)
 	router.With(auth.RequireAuth(cfg.SessionSecret), auth.RequireRole(db, "admin")).Get("/api/school-groups/{groupId}/members", schoolGroupHandler.Members)

@@ -29,6 +29,7 @@
 - 質問カテゴリと担当部署の管理
 - 公開質問、個別相談、回答、解決状態の管理
 - 権限を考慮した学校内横断検索
+- PDF・JPEG・PNG・WebPの添付と認証付きダウンロード
 - 管理者によるアカウント追加（ユーザー名、メールアドレス、初期パスワード、Role）
 - 管理者によるユーザーRole・有効状態の管理
 
@@ -92,8 +93,11 @@ postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable
 | 質問・相談 | `GET /api/questions`、`POST /api/questions`、`POST /api/questions/{id}/answers` |
 | 質問カテゴリ管理 | `POST /api/question-categories`、`PATCH /api/question-categories/{id}` |
 | 横断検索 | `GET /api/search?q={検索語}` |
+| 添付 | `POST /api/school-posts/{id}/attachments`、`POST /api/questions/{id}/attachments`、`POST /api/answers/{id}/attachments`、`GET /api/attachments/{id}/download` |
 
 学校機能APIは認証を必要とし、管理機能・教員機能にはRoleによるアクセス制御があります。
+
+添付は1件の連絡・質問・回答に最大5ファイル、1ファイル10MB、合計25MBまでです。保存先S3バケットは`ATTACHMENT_BUCKET`、リージョンは`AWS_REGION`で指定します。バケットは非公開とし、ファイルは認証・閲覧権限を確認するAPI経由で配信します。
 
 公開signup APIは提供していません。アカウントは管理者が認証済みの`POST /api/admin/users`を通じて発行します。
 
