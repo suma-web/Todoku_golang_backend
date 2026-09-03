@@ -1,0 +1,102 @@
+title {label: "Todoku Entity-Relationship Diagram", size: "24", font: "Helvetica"}
+entity {bgcolor: "#ffffff", font: "Helvetica", size: "13", border-color: "#94a3b8"}
+header {bgcolor: "#e2e8f0", font: "Helvetica", size: "16", border-color: "#64748b"}
+relationship {color: "#475569", size: "11", font: "Helvetica"}
+
+[users] {bgcolor: "#f8fafc"}
+  *id {label: "bigserial, not null"}
+  name {label: "varchar(50), not null"}
+  email {label: "varchar(255), not null, unique"}
+  password_hash {label: "text, not null"}
+  role {label: "varchar(20), not null"}
+  is_active {label: "boolean, not null"}
+  created_at {label: "timestamptz, not null"}
+  updated_at {label: "timestamptz, not null"}
+
+[school_groups] {bgcolor: "#fff7ed"}
+  *id {label: "bigserial, not null"}
+  name {label: "varchar(100), not null"}
+  type {label: "varchar(20), not null"}
+  created_at {label: "timestamptz, not null"}
+  `UNIQUE(name, type)`
+
+[user_school_groups] {bgcolor: "#f5f3ff"}
+  *+user_id {label: "bigint, not null"}
+  *+group_id {label: "bigint, not null"}
+
+[school_posts] {bgcolor: "#fff7ed"}
+  *id {label: "bigserial, not null"}
+  +author_id {label: "bigint, not null"}
+  type {label: "notice | emergency"}
+  title {label: "varchar(200), not null"}
+  content {label: "text, not null"}
+  priority {label: "normal | important | urgent"}
+  expires_at {label: "timestamptz, null"}
+  created_at {label: "timestamptz, not null"}
+  updated_at {label: "timestamptz, not null"}
+
+[school_post_groups] {bgcolor: "#f5f3ff"}
+  *+post_id {label: "bigint, not null"}
+  *+group_id {label: "bigint, not null"}
+
+[school_post_statuses] {bgcolor: "#f5f3ff"}
+  *+post_id {label: "bigint, not null"}
+  *+user_id {label: "bigint, not null"}
+  read_at {label: "timestamptz, null"}
+
+[question_categories] {bgcolor: "#fdf4ff"}
+  *id {label: "bigserial, not null"}
+  name {label: "varchar(100), not null, unique"}
+  +group_id {label: "bigint, not null"}
+  created_at {label: "timestamptz, not null"}
+  is_active {label: "boolean, not null"}
+
+[questions] {bgcolor: "#fdf4ff"}
+  *id {label: "bigserial, not null"}
+  +user_id {label: "bigint, not null"}
+  +category_id {label: "bigint, not null"}
+  title {label: "varchar(200), not null"}
+  content {label: "text, not null"}
+  visibility {label: "public | private"}
+  status {label: "open | answered | resolved"}
+  created_at {label: "timestamptz, not null"}
+  updated_at {label: "timestamptz, not null"}
+
+[question_answers] {bgcolor: "#fdf4ff"}
+  *id {label: "bigserial, not null"}
+  +question_id {label: "bigint, not null"}
+  +user_id {label: "bigint, not null"}
+  content {label: "text, not null"}
+  created_at {label: "timestamptz, not null"}
+
+[attachments] {bgcolor: "#ecfeff"}
+  *id {label: "bigserial, not null"}
+  +uploaded_by {label: "bigint, not null"}
+  +school_post_id {label: "bigint, null"}
+  +question_id {label: "bigint, null"}
+  +answer_id {label: "bigint, null"}
+  original_name {label: "varchar(255), not null"}
+  storage_key {label: "varchar(500), not null, unique"}
+  content_type {label: "varchar(100), not null"}
+  size_bytes {label: "bigint, not null, > 0"}
+  created_at {label: "timestamptz, not null"}
+  `CHECK exactly one parent`
+
+users 1--* user_school_groups
+school_groups 1--* user_school_groups
+users 1--* school_posts
+school_posts 1--* school_post_groups
+school_groups 1--* school_post_groups
+school_posts 1--* school_post_statuses
+users 1--* school_post_statuses
+school_groups 1--* question_categories
+users 1--* questions
+question_categories 1--* questions
+questions 1--* question_answers
+users 1--* question_answers
+users 1--* attachments {label: "uploaded by"}
+
+# An attachment belongs to exactly one of these optional parent relationships.
+school_posts ?--* attachments
+questions ?--* attachments
+question_answers ?--* attachments

@@ -108,6 +108,10 @@ go vet ./...
 go test ./...
 ```
 
+## データモデル
+
+現行スキーマのER図、編集可能なソース、再生成手順は[ER図ドキュメント](docs/architecture/erd/README.md)を参照してください。
+
 ## AWS添付ストレージ
 
 S3バケットとECSタスクロールは`deploy/aws/attachment-storage.yml`で定義しています。バケットは公開アクセスをすべて拒否し、暗号化とバージョニングを有効にします。
@@ -165,6 +169,8 @@ ServiceはRepositoryインターフェースへ依存するため、PostgreSQL�
 │   └── user/                # ユーザー・認証
 ├── migrations/              # データベース定義
 ├── docs/DEMO.md             # デモアカウントと確認手順
+├── docs/architecture/erd/   # ER図のソース・SVG・PDF
+├── scripts/generate-erd.sh  # ER図の再生成
 ├── Dockerfile
 └── compose.yml
 ```
