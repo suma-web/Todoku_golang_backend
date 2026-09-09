@@ -41,7 +41,7 @@ func ClearSessionCookie(w http.ResponseWriter, secure bool) {
 	})
 }
 
-func RequireAuth(secret string) func(http.Handler) http.Handler {
+func RequireAuth(secret string, databases ...*sql.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie(cookieName)
@@ -59,7 +59,17 @@ func RequireAuth(secret string) func(http.Handler) http.Handler {
 				writeUnauthorized(w, "セッションが無効です")
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userIDKey{}, userID)))
+			ctx := context.WithValue(r.Context(), userIDKey{}, userID)
+			if len(databases) > 0 && databases[0] != nil {
+				var role string
+				var active bool
+				if err := databases[0].QueryRowContext(ctx, `SELECT role,is_active FROM users WHERE id=$1 AND deleted_at IS NULL`, userID).Scan(&role, &active); err != nil || !active {
+					writeUnauthorized(w, "アカウントが無効です")
+					return
+				}
+				ctx = context.WithValue(ctx, roleKey{}, role)
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
@@ -87,11 +97,13 @@ func RequireRole(db *sql.DB, roles ...string) func(http.Handler) http.Handler {
 				writeUnauthorized(w, "ログインが必要です")
 				return
 			}
-			var role string
-			var active bool
-			if err := db.QueryRowContext(r.Context(), `SELECT role,is_active FROM users WHERE id=$1`, id).Scan(&role, &active); err != nil || !active {
-				writeUnauthorized(w, "アカウントが無効です")
-				return
+			role, hasRole := r.Context().Value(roleKey{}).(string)
+			if !hasRole {
+				var active bool
+				if err := db.QueryRowContext(r.Context(), `SELECT role,is_active FROM users WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&role, &active); err != nil || !active {
+					writeUnauthorized(w, "アカウントが無効です")
+					return
+				}
 			}
 			if !allowed[role] {
 				http.Error(w, `{"error":{"code":"FORBIDDEN","message":"権限がありません"}}`, http.StatusForbidden)

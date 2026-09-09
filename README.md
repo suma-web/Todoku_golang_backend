@@ -35,7 +35,7 @@
 - 権限を考慮した学校内横断検索
 - PDF・JPEG・PNG・WebPの添付と認証付きダウンロード
 - 管理者によるアカウント追加（ユーザー名、メールアドレス、初期パスワード、Role）
-- 管理者によるユーザーRole・有効状態の管理
+- 管理者によるユーザーRole・有効状態の管理と、履歴を保持するアカウント論理削除
 
 ## Role
 
@@ -99,7 +99,7 @@ postgres://todoku_user:todoku_password@localhost:5432/todoku?sslmode=disable
 | 分類 | エンドポイント例 |
 | --- | --- |
 | 認証 | `POST /api/login`、`POST /api/logout`、`GET /api/me` |
-| ユーザー管理 | `POST /api/admin/users`、`GET /api/admin/users`、`PATCH /api/admin/users/{id}` |
+| ユーザー管理 | `POST /api/admin/users`、`GET /api/admin/users`、`PATCH /api/admin/users/{id}`、`DELETE /api/admin/users/{id}` |
 | 所属管理 | `GET /api/school-groups`、`POST /api/school-groups` |
 | 学校連絡 | `POST /api/school-posts`、`GET /api/timeline`、`GET /api/school-posts/{id}`、`PATCH /api/school-posts/{id}`、`DELETE /api/school-posts/{id}` |
 | 既読状況 | `POST /api/school-posts/{id}/read`、`GET /api/school-posts/{id}/status`、`GET /api/me/school-posts` |
@@ -121,7 +121,7 @@ go vet ./...
 go test ./... -race -coverprofile=coverage.out
 ```
 
-2026年9月4日時点で25テスト、全体ステートメントカバレッジ11.2%、添付パッケージ40.8%です。認証Cookie、Role・閲覧権限、private質問、所属別連絡、添付の形式・件数・容量、認証前のストレージアクセス防止を重点的に検証しています。
+2026年9月10日時点で33テスト、全体ステートメントカバレッジ14.6%、添付パッケージ40.8%、ユーザー管理パッケージ37.7%です。認証Cookie、無効アカウントのセッション拒否、管理者の自己変更・自己削除防止、最後の有効管理者保護、Role・閲覧権限、private質問、所属別連絡、添付の形式・件数・容量、認証前のストレージアクセス防止を重点的に検証しています。
 
 テスト対象、期待するリスク、実行結果の詳細は[テスト方針と結果](docs/TESTING.md)を参照してください。CIではrace detectorとカバレッジ下限10%を毎回検証します。
 

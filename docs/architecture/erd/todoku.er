@@ -10,6 +10,7 @@ relationship {color: "#475569", size: "11", font: "Helvetica"}
   password_hash {label: "text, not null"}
   role {label: "varchar(20), not null"}
   is_active {label: "boolean, not null"}
+  deleted_at {label: "timestamptz, null"}
   created_at {label: "timestamptz, not null"}
   updated_at {label: "timestamptz, not null"}
 
