@@ -6,7 +6,7 @@
 
 学習用Webアプリを基盤に学校向けサービスとして再設計し、要件定義2日・主要機能の実装4日・テスト2日の計8稼働日で集中開発しました。その後もAWSへのデプロイ、CI、負荷試験、セキュリティ改善を継続しています。
 
-[本番環境](https://todoku-service.com) | [フロントエンド](https://github.com/suma-web/Todoku_react_frontend) | [デモ動画](https://github.com/suma-web/Todoku_react_frontend/releases/tag/demo-v1.0) | [AWS構成図](docs/architecture/aws.md) | [ER図](docs/architecture/erd/README.md)
+[本番環境](https://todoku-service.com) | [フロントエンド](https://github.com/suma-web/Todoku_react_frontend) | [60秒デモ動画](https://github.com/suma-web/Todoku_react_frontend/releases/download/demo-v1.0/todoku-demo-60sec.mp4) | [AWS構成図](docs/architecture/aws.md) | [ER図](docs/architecture/erd/README.md)
 
 ## 解決したい課題
 
