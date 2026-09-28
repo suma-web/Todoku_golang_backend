@@ -8,14 +8,30 @@ services:
       POSTGRES_DB: todoku
     ports:
       - "5432:5432"
+    # Schema migrations run once through the backend schema_migrations ledger.
+    # Do not also mount migrations into /docker-entrypoint-initdb.d.
     volumes:
       - todoku_postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U todoku_user -d todoku"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["/app/seed"]
+    environment:
+      APP_ENV: development
+      DEMO_SEED: "true"
+      DEMO_SEED_ONCE: "true"
+      DATABASE_URL: "postgres://todoku_user:todoku_password@postgres:5432/todoku?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   backend:
     build:
@@ -30,6 +46,8 @@ services:
       FRONTEND_URL: "http://localhost:5173"
       SESSION_SECRET: "development-session-secret-change-me"
     depends_on:
+      seed:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
 

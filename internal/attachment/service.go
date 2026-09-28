@@ -180,7 +180,7 @@ func (s *Service) canUpload(ctx context.Context, userID int64, parent ParentType
 	query := ""
 	switch parent {
 	case SchoolPostParent:
-		query = `SELECT EXISTS(SELECT 1 FROM school_posts p JOIN users u ON u.id=$1 WHERE p.id=$2 AND(p.author_id=$1 OR u.role='admin'))`
+		query = `SELECT EXISTS(SELECT 1 FROM school_posts p JOIN users u ON u.id=$1 WHERE p.id=$2 AND NOT EXISTS(SELECT 1 FROM school_posts n WHERE n.previous_post_id=p.id) AND(p.author_id=$1 OR u.role='admin'))`
 	case QuestionParent:
 		query = `SELECT EXISTS(SELECT 1 FROM questions q JOIN users u ON u.id=$1 WHERE q.id=$2 AND(q.user_id=$1 OR u.role='admin'))`
 	case AnswerParent:

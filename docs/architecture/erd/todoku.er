@@ -26,6 +26,8 @@ relationship {color: "#475569", size: "11", font: "Helvetica"}
   *+group_id {label: "bigint, not null"}
 
 [school_posts] {bgcolor: "#fff7ed"}
+  +previous_post_id {label: "bigint, null, unique; RESTRICT"}
+  change_summary {label: "text, not null"}
   *id {label: "bigserial, not null"}
   +author_id {label: "bigint, not null"}
   type {label: "notice | emergency"}
@@ -44,6 +46,23 @@ relationship {color: "#475569", size: "11", font: "Helvetica"}
   *+post_id {label: "bigint, not null"}
   *+user_id {label: "bigint, not null"}
   read_at {label: "timestamptz, null"}
+
+[notifications] {bgcolor: "#fef2f2"}
+  *id {label: "bigserial, not null"}
+  +recipient_user_id {label: "bigint, not null; CASCADE"}
+  +actor_user_id {label: "bigint, null; SET NULL"}
+  +post_id {label: "bigint, not null; CASCADE"}
+  kind {label: "important_update"}
+  read_at {label: "timestamptz, null"}
+  created_at {label: "timestamptz, not null"}
+
+[schema_migrations] {bgcolor: "#f1f5f9"}
+  *name {label: "text, not null"}
+  applied_at {label: "timestamptz, not null"}
+
+[demo_seed_runs] {bgcolor: "#f1f5f9"}
+  *name {label: "text, not null; development only"}
+  completed_at {label: "timestamptz, not null"}
 
 [question_categories] {bgcolor: "#fdf4ff"}
   *id {label: "bigserial, not null"}
@@ -101,3 +120,8 @@ users 1--* attachments {label: "uploaded by"}
 school_posts ?--* attachments
 questions ?--* attachments
 question_answers ?--* attachments
+
+school_posts ?--? school_posts {label: "previous_post_id (one successor)"}
+users 1--* notifications {label: "recipient"}
+users ?--* notifications {label: "actor"}
+school_posts 1--* notifications

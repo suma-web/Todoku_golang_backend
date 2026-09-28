@@ -58,19 +58,45 @@ func (r *SQLRepository) Update(ctx context.Context, postID, userID int64, input 
 	}
 	defer tx.Rollback()
 
-	err = tx.QueryRowContext(ctx, `UPDATE school_posts SET type=$3,title=$4,content=$5,priority=$6,expires_at=$7,updated_at=NOW()
-		WHERE id=$1 AND (author_id=$2 OR (SELECT role FROM users WHERE id=$2)='admin')
-		RETURNING author_id,created_at,updated_at`, postID, userID, input.Type, input.Title, input.Content, input.Priority, input.ExpiresAt,
-	).Scan(&input.AuthorID, &input.CreatedAt, &input.UpdatedAt)
+	// Serialize edits/reposts on their source so a second request cannot branch history.
+	if err = tx.QueryRowContext(ctx, `SELECT author_id FROM school_posts WHERE id=$1 AND (author_id=$2 OR (SELECT role FROM users WHERE id=$2)='admin') FOR UPDATE`, postID, userID).Scan(&input.AuthorID); err != nil {
+		return Post{}, err
+	}
+	var superseded bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM school_posts WHERE previous_post_id=$1)`, postID).Scan(&superseded); err != nil {
+		return Post{}, err
+	}
+	if superseded {
+		return Post{}, ErrConflict
+	}
+	if input.Notify {
+		input.PreviousPostID = &postID
+		err = tx.QueryRowContext(ctx, `INSERT INTO school_posts(author_id,type,title,content,priority,expires_at,previous_post_id,change_summary)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,created_at,updated_at`, input.AuthorID, input.Type, input.Title, input.Content, input.Priority, input.ExpiresAt, postID, input.ChangeSummary).Scan(&input.ID, &input.CreatedAt, &input.UpdatedAt)
+	} else {
+		input.ID = postID
+		err = tx.QueryRowContext(ctx, `UPDATE school_posts SET type=$3,title=$4,content=$5,priority=$6,expires_at=$7,updated_at=NOW()
+        WHERE id=$1 AND author_id=$2 RETURNING created_at,updated_at,previous_post_id,change_summary`, postID, input.AuthorID, input.Type, input.Title, input.Content, input.Priority, input.ExpiresAt).Scan(&input.CreatedAt, &input.UpdatedAt, &input.PreviousPostID, &input.ChangeSummary)
+	}
 	if err != nil {
 		return Post{}, err
 	}
-	input.ID = postID
-	if _, err = tx.ExecContext(ctx, `DELETE FROM school_post_groups WHERE post_id=$1`, postID); err != nil {
+	if _, err = tx.ExecContext(ctx, `DELETE FROM school_post_groups WHERE post_id=$1`, input.ID); err != nil {
 		return Post{}, err
 	}
 	for _, groupID := range input.GroupIDs {
-		if _, err = tx.ExecContext(ctx, `INSERT INTO school_post_groups(post_id,group_id) VALUES($1,$2)`, postID, groupID); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO school_post_groups(post_id,group_id) VALUES($1,$2)`, input.ID, groupID); err != nil {
+			return Post{}, err
+		}
+	}
+	if input.Notify {
+		// Use the updated audience, deduplicating users in multiple groups.
+		_, err = tx.ExecContext(ctx, `INSERT INTO notifications(recipient_user_id,actor_user_id,post_id,kind)
+            SELECT DISTINCT u.id,$2::bigint,p.id,'important_update'
+            FROM school_posts p JOIN school_post_groups pg ON pg.post_id=p.id
+            JOIN user_school_groups ug ON ug.group_id=pg.group_id JOIN users u ON u.id=ug.user_id
+            WHERE p.id=$1 AND u.id<>p.author_id AND u.id<>$2 AND u.is_active AND u.deleted_at IS NULL`, input.ID, userID)
+		if err != nil {
 			return Post{}, err
 		}
 	}
@@ -87,27 +113,73 @@ func (r *SQLRepository) Get(ctx context.Context, postID, userID int64) (Post, er
 	var item Post
 	err := r.db.QueryRowContext(ctx, `SELECT p.id,p.author_id,u.name,p.type,p.title,p.content,p.priority,p.expires_at,p.created_at,p.updated_at,
 		EXISTS(SELECT 1 FROM school_post_groups target_pg JOIN user_school_groups target_ug ON target_ug.group_id=target_pg.group_id WHERE target_pg.post_id=p.id AND target_ug.user_id=$2),
-		EXISTS(SELECT 1 FROM school_post_statuses s WHERE s.post_id=p.id AND s.user_id=$2 AND s.read_at IS NOT NULL)
+		EXISTS(SELECT 1 FROM school_post_statuses s WHERE s.post_id=p.id AND s.user_id=$2 AND s.read_at IS NOT NULL),
+ p.previous_post_id,p.change_summary,EXISTS(SELECT 1 FROM school_posts successor WHERE successor.previous_post_id=p.id)
 		FROM school_posts p JOIN users u ON u.id=p.author_id JOIN users viewer ON viewer.id=$2
 		WHERE p.id=$1 AND (p.author_id=$2 OR viewer.role='admin' OR ((p.expires_at IS NULL OR p.expires_at>=NOW()) AND EXISTS(
 			SELECT 1 FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=p.id AND ug.user_id=$2
 		)))`, postID, userID).Scan(
 		&item.ID, &item.AuthorID, &item.AuthorName, &item.Type, &item.Title,
 		&item.Content, &item.Priority, &item.ExpiresAt, &item.CreatedAt, &item.UpdatedAt, &item.TargetedByMe, &item.ReadByMe,
+		&item.PreviousPostID, &item.ChangeSummary, &item.Superseded,
 	)
 	if err == nil {
 		item.GroupIDs, err = r.groupIDs(ctx, item.ID)
 	}
+	if err == nil {
+		err = r.historyLinks(ctx, &item, userID)
+	}
 	return item, err
 }
 
+func (r *SQLRepository) historyLinks(ctx context.Context, item *Post, userID int64) error {
+	const access = `(p.author_id=$2 OR (SELECT role FROM users WHERE id=$2)='admin' OR ((p.expires_at IS NULL OR p.expires_at>=NOW()) AND EXISTS(SELECT 1 FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=p.id AND ug.user_id=$2)))`
+	if item.PreviousPostID != nil {
+		if err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM school_posts p WHERE p.id=$1 AND `+access+`)`, *item.PreviousPostID, userID).Scan(&item.CanViewPrevious); err != nil {
+			return err
+		}
+	}
+	if item.Superseded {
+		var id int64
+		err := r.db.QueryRowContext(ctx, `WITH RECURSIVE chain AS (
+          SELECT id FROM school_posts WHERE id=$1 UNION ALL SELECT p.id FROM school_posts p JOIN chain c ON p.previous_post_id=c.id
+        ) SELECT p.id FROM school_posts p JOIN chain c ON c.id=p.id WHERE NOT EXISTS(SELECT 1 FROM school_posts n WHERE n.previous_post_id=p.id) AND `+access, item.ID, userID).Scan(&id)
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		item.LatestPostID = &id
+	}
+	return nil
+}
+
 func (r *SQLRepository) Delete(ctx context.Context, postID, userID int64) (bool, error) {
-	result, err := r.db.ExecContext(ctx, `DELETE FROM school_posts WHERE id=$1 AND(author_id=$2 OR(SELECT role FROM users WHERE id=$2)='admin')`, postID, userID)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
 	}
-	count, err := result.RowsAffected()
-	return count > 0, err
+	defer tx.Rollback()
+	var previous *int64
+	err = tx.QueryRowContext(ctx, `SELECT previous_post_id FROM school_posts WHERE id=$1 AND(author_id=$2 OR(SELECT role FROM users WHERE id=$2)='admin') FOR UPDATE`, postID, userID).Scan(&previous)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var hasNext bool
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM school_posts WHERE previous_post_id=$1)`, postID).Scan(&hasNext); err != nil {
+		return false, err
+	}
+	if previous != nil || hasNext {
+		return false, ErrConflict
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM school_posts WHERE id=$1`, postID); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
 }
 
 func (r *SQLRepository) Timeline(ctx context.Context, userID int64) ([]Post, error) {
@@ -115,9 +187,9 @@ func (r *SQLRepository) Timeline(ctx context.Context, userID int64) ([]Post, err
 		EXISTS(SELECT 1 FROM school_post_statuses s WHERE s.post_id=p.id AND s.user_id=$1 AND s.read_at IS NOT NULL),
 		EXISTS(SELECT 1 FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=p.id AND ug.user_id=$1 AND p.author_id<>$1)
 		FROM school_posts p JOIN users u ON u.id=p.author_id JOIN users viewer ON viewer.id=$1
-		WHERE viewer.role='admin' OR ((p.expires_at IS NULL OR p.expires_at>=NOW()) AND EXISTS(
+		WHERE NOT EXISTS(SELECT 1 FROM school_posts n WHERE n.previous_post_id=p.id) AND (viewer.role='admin' OR ((p.expires_at IS NULL OR p.expires_at>=NOW()) AND EXISTS(
 			SELECT 1 FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=p.id AND ug.user_id=$1
-		)) ORDER BY CASE p.priority WHEN 'urgent' THEN 1 WHEN 'important' THEN 2 ELSE 3 END,p.created_at DESC LIMIT 100`, userID)
+		))) ORDER BY CASE p.priority WHEN 'urgent' THEN 1 WHEN 'important' THEN 2 ELSE 3 END,p.created_at DESC LIMIT 100`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,18 +201,24 @@ func (r *SQLRepository) Timeline(ctx context.Context, userID int64) ([]Post, err
 		if err := rows.Scan(&item.ID, &item.AuthorID, &item.AuthorName, &item.Type, &item.Title, &item.Content, &item.Priority, &item.ExpiresAt, &item.CreatedAt, &item.UpdatedAt, &item.ReadByMe, &item.TargetedByMe); err != nil {
 			return nil, err
 		}
-		item.GroupIDs, err = r.groupIDs(ctx, item.ID)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	for i := range items {
+		items[i].GroupIDs, err = r.groupIDs(ctx, items[i].ID)
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, item)
 	}
-	return items, rows.Err()
+	return items, nil
 }
 
 func (r *SQLRepository) Authored(ctx context.Context, userID int64) ([]Post, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT p.id,p.author_id,u.name,p.type,p.title,p.content,p.priority,p.expires_at,p.created_at,p.updated_at
-		FROM school_posts p JOIN users u ON u.id=p.author_id WHERE p.author_id=$1 ORDER BY p.created_at DESC LIMIT 100`, userID)
+		FROM school_posts p JOIN users u ON u.id=p.author_id WHERE p.author_id=$1 AND NOT EXISTS(SELECT 1 FROM school_posts n WHERE n.previous_post_id=p.id) ORDER BY p.created_at DESC LIMIT 100`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -151,17 +229,25 @@ func (r *SQLRepository) Authored(ctx context.Context, userID int64) ([]Post, err
 		if err := rows.Scan(&item.ID, &item.AuthorID, &item.AuthorName, &item.Type, &item.Title, &item.Content, &item.Priority, &item.ExpiresAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
-		item.GroupIDs, err = r.groupIDs(ctx, item.ID)
-		if err != nil {
-			return nil, err
-		}
-		item.ReadUsers, err = r.statusUsers(ctx, item.ID, "read")
-		if err != nil {
-			return nil, err
-		}
 		items = append(items, item)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	for i := range items {
+		items[i].GroupIDs, err = r.groupIDs(ctx, items[i].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for i := range items {
+		items[i].ReadUsers, err = r.statusUsers(ctx, items[i].ID, "read")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
 }
 
 func (r *SQLRepository) IsTarget(ctx context.Context, postID, userID int64) (bool, error) {

@@ -114,6 +114,41 @@ func main() {
 	if err := database.Migrate(ctx, db, "migrations"); err != nil {
 		log.Fatal(err)
 	}
+	once := os.Getenv("DEMO_SEED_ONCE") == "true"
+	if once {
+		if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS demo_seed_runs (name TEXT PRIMARY KEY, completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`); err != nil {
+			log.Fatal(err)
+		}
+		var done bool
+		if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM demo_seed_runs WHERE name='school-demo-v1')`).Scan(&done); err != nil {
+			log.Fatal(err)
+		}
+		if done {
+			fmt.Println("開発seedは投入済みのためスキップしました。")
+			return
+		}
+		// Preserve databases already seeded manually; do not reset demo activity.
+		var existing int
+		for _, user := range users {
+			var found bool
+			if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)`, user.Email).Scan(&found); err != nil {
+				log.Fatal(err)
+			}
+			if found {
+				existing++
+			}
+		}
+		if existing > 0 {
+			if existing != len(users) {
+				log.Fatal("一部のデモユーザーが存在します。自動上書きを避けるため停止しました。手動seedで状態を確認してください。")
+			}
+			if _, err := db.ExecContext(ctx, `INSERT INTO demo_seed_runs(name) VALUES('school-demo-v1') ON CONFLICT DO NOTHING`); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println("既存のデモユーザーを検出したため、データを保持してスキップしました。")
+			return
+		}
+	}
 	if err := seed(ctx, db); err != nil {
 		log.Fatal(err)
 	}
@@ -121,6 +156,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if once {
+		if _, err := db.ExecContext(ctx, `INSERT INTO demo_seed_runs(name) VALUES('school-demo-v1') ON CONFLICT DO NOTHING`); err != nil {
+			log.Fatal(err)
+		}
+	}
 	fmt.Println("デモデータを投入・検証しました。再実行しても同じデモデータを更新します。")
 	fmt.Println("ログイン情報:")
 	for _, user := range users {

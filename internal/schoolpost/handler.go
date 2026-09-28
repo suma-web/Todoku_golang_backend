@@ -47,7 +47,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.Create(r.Context(), currentUserID(r), input)
 	switch {
 	case errors.Is(err, ErrValidation):
-		bad(w, http.StatusBadRequest, "タイトル、本文、対象所属を入力し、有効期限は現在から2年以内で指定してください")
+		bad(w, http.StatusBadRequest, "タイトル、本文、対象所属を入力し、有効期限は現在から2年以内で指定してください。再投稿時は変更点を500文字以内で入力してください")
 	case err != nil:
 		bad(w, http.StatusBadRequest, "投稿内容が不正です")
 	default:
@@ -83,7 +83,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.Update(r.Context(), id, currentUserID(r), input)
 	switch {
 	case errors.Is(err, ErrValidation):
-		bad(w, http.StatusBadRequest, "タイトル、本文、対象所属を入力し、有効期限は現在から2年以内で指定してください")
+		bad(w, http.StatusBadRequest, "タイトル、本文、対象所属を入力し、有効期限は現在から2年以内で指定してください。再投稿時は変更点を500文字以内で入力してください")
+	case errors.Is(err, ErrConflict):
+		bad(w, http.StatusConflict, "過去の投稿は変更できません。最新版を開いてください")
 	case errors.Is(err, ErrNotFound):
 		bad(w, http.StatusNotFound, "投稿が見つからないか編集権限がありません")
 	case err != nil:
@@ -100,6 +102,10 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = h.service.Delete(r.Context(), id, currentUserID(r))
+	if errors.Is(err, ErrConflict) {
+		bad(w, http.StatusConflict, "履歴に紐づく投稿は削除できません")
+		return
+	}
 	if errors.Is(err, ErrNotFound) {
 		bad(w, http.StatusNotFound, "投稿が見つからないか権限がありません")
 		return

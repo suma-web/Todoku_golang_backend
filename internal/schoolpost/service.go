@@ -2,6 +2,7 @@ package schoolpost
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 var (
 	ErrValidation = errors.New("validation error")
 	ErrNotFound   = errors.New("school post not found")
+	ErrConflict   = errors.New("post is part of a preserved history")
 	ErrForbidden  = errors.New("forbidden")
 )
 
@@ -30,15 +32,20 @@ func (s *Service) Create(ctx context.Context, authorID int64, input Post) (Post,
 }
 
 func (s *Service) Update(ctx context.Context, postID, userID int64, input Post) (Post, error) {
+	input.ChangeSummary = strings.TrimSpace(input.ChangeSummary)
+	if input.Notify && (input.ChangeSummary == "" || len([]rune(input.ChangeSummary)) > 500) {
+		return Post{}, ErrValidation
+	}
+
 	input, err := validatePost(input)
 	if err != nil {
 		return Post{}, err
 	}
 	item, err := s.repository.Update(ctx, postID, userID, input)
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		return Post{}, ErrNotFound
 	}
-	return item, nil
+	return item, err
 }
 
 func validatePost(input Post) (Post, error) {
