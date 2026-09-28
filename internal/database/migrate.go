@@ -13,7 +13,19 @@ import (
 // only processed for a new volume, so application startup must handle upgrades
 // for databases that already contain user data.
 func Migrate(ctx context.Context, db *sql.DB, directory string) error {
-	if _, err := db.ExecContext(ctx, `
+	// ECS can start multiple tasks together. Serialize schema changes on a
+	// dedicated connection; transaction-pool connections cannot hold this lock.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("migration connection: %w", err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock(824092801)`); err != nil {
+		return fmt.Errorf("migration lock: %w", err)
+	}
+	defer conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock(824092801)`)
+
+	if _, err := conn.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY,
 			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -32,7 +44,7 @@ func Migrate(ctx context.Context, db *sql.DB, directory string) error {
 		}
 
 		var applied bool
-		if err := db.QueryRowContext(ctx,
+		if err := conn.QueryRowContext(ctx,
 			`SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = $1)`,
 			entry.Name(),
 		).Scan(&applied); err != nil {
@@ -46,7 +58,7 @@ func Migrate(ctx context.Context, db *sql.DB, directory string) error {
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", entry.Name(), err)
 		}
-		tx, err := db.BeginTx(ctx, nil)
+		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("begin migration %s: %w", entry.Name(), err)
 		}

@@ -22,7 +22,7 @@ func (r *SQLRepository) Search(ctx context.Context, userID int64, query string) 
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT type,id,title,excerpt,category,department,created_at,expires_at FROM (
 		 SELECT 'post' AS type,p.id,p.title,LEFT(p.content,200) AS excerpt,'' AS category,'' AS department,p.created_at,p.expires_at,p.created_at AS sort_at
-		 FROM school_posts p WHERE (p.title ILIKE $2 OR p.content ILIKE $2) AND (p.expires_at IS NULL OR p.expires_at>=NOW())
+		 FROM school_posts p WHERE NOT EXISTS(SELECT 1 FROM school_posts n WHERE n.previous_post_id=p.id) AND (p.title ILIKE $2 OR p.content ILIKE $2) AND (p.expires_at IS NULL OR p.expires_at>=NOW())
 		 AND EXISTS(SELECT 1 FROM school_post_groups pg JOIN user_school_groups ug ON ug.group_id=pg.group_id WHERE pg.post_id=p.id AND ug.user_id=$1)
 		 UNION ALL
 		 SELECT 'question',q.id,q.title,LEFT(q.content,200),c.name,g.name,q.created_at,NULL::timestamptz,q.updated_at FROM questions q JOIN question_categories c ON c.id=q.category_id JOIN school_groups g ON g.id=c.group_id

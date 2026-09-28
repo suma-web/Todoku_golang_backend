@@ -16,6 +16,7 @@ import (
 	"todoku_golang_backend/internal/auth"
 	"todoku_golang_backend/internal/config"
 	"todoku_golang_backend/internal/database"
+	"todoku_golang_backend/internal/notification"
 	"todoku_golang_backend/internal/question"
 	"todoku_golang_backend/internal/schooladmin"
 	"todoku_golang_backend/internal/schoolgroup"
@@ -64,6 +65,7 @@ func main() {
 	attachmentStorage := attachment.NewS3Storage(s3.NewFromConfig(awsCfg), cfg.AttachmentBucket)
 	attachmentHandler := attachment.NewHandler(attachment.NewService(db, attachmentStorage))
 
+	notificationHandler := notification.NewHandler(notification.NewService(notification.NewRepository(db)))
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
@@ -95,6 +97,9 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	router.With(auth.RequireAuth(cfg.SessionSecret, db)).Get("/api/notifications", notificationHandler.List)
+	router.With(auth.RequireAuth(cfg.SessionSecret, db)).Post("/api/notifications/{id}/read", notificationHandler.Read)
 
 	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

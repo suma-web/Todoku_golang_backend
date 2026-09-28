@@ -7,8 +7,7 @@
 PostgreSQLを起動し、バックエンドリポジトリで明示的にseedを実行します。
 
 ```bash
-docker compose up -d postgres
-docker compose run --rm -e DEMO_SEED=true backend go run ./cmd/seed
+docker compose up --build -d
 ```
 
 ホスト上のGoから実行する場合：
@@ -21,7 +20,10 @@ go run ./cmd/seed
 
 - `DEMO_SEED=true`がない場合は実行を拒否します。
 - `APP_ENV=production`の場合も実行を拒否します。
-- APIサーバーの通常起動や`docker compose up`だけではseedされません。
+- 開発用`docker compose up --build -d`はDB → seed → APIの順に起動します。
+- Composeのseedは初回のみです。投入済みのDBや既存のデモユーザー7名があるDBは変更せずスキップします。
+- 明示的にデモデータをリセットする場合は `docker compose run --rm -e DEMO_SEED_ONCE=false seed` を実行します。
+- API単独の起動ではseedされません。本番デプロイには開発用Composeを使用しません。
 - 同じコマンドを再実行すると、デモ用レコードを更新して指定状態へ戻します。ユーザー、所属、連絡、質問が実行回数分増えることはありません。
 - seed終了前に、所属配信、非公開相談の閲覧範囲、確認集計、横断検索を自動検証します。検証に失敗した場合は非0で終了します。
 
