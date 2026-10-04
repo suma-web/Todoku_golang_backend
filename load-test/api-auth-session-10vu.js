@@ -1,3 +1,4 @@
+// 認証セッション試験: 10 VUで3分間、Cookieを保持して5回操作ごとにログアウトする。
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { SharedArray } from "k6/data";
@@ -30,7 +31,7 @@ export default function () {
   const user = users[(__VU - 1) % users.length];
 
   // -------------------------
-  // 1. login
+  // 1. 未ログイン時のみログイン（反復間で認証状態とCookieを保持）
   // -------------------------
   if (!loggedIn) {
     const loginRes = http.post(
@@ -65,6 +66,7 @@ export default function () {
     loggedIn = true;
     actionCount = 0;
 
+    // 認証Cookieをログに出力するため、出力結果の共有時には取り扱いに注意。
     const cookies = http
       .cookieJar()
       .cookiesForURL(API_URL);
@@ -75,7 +77,7 @@ export default function () {
   }
 
   // -------------------------
-  // 2. /api/me
+  // 2. ユーザー情報の200応答を確認。失敗時は次の反復で再ログイン
   // -------------------------
   const cookiesBeforeMe = http
     .cookieJar()
@@ -110,7 +112,7 @@ export default function () {
   }
 
   // -------------------------
-  // 3. timeline
+  // 3. タイムラインの200応答を確認（失敗でも操作回数を加算）
   // -------------------------
   const timelineRes = http.get(
     `${API_URL}/api/timeline`,
@@ -136,7 +138,7 @@ export default function () {
   sleep(2);
 
   // -------------------------
-  // 4. 5回操作したらlogout
+  // 4. タイムライン取得を5回試行したらログアウトし、200または204を確認
   // -------------------------
   if (actionCount < 5) {
     return;
@@ -165,7 +167,8 @@ export default function () {
   );
 
   // -------------------------
-  // 5. logout後の認証確認
+  // 5. ログアウト後の401を確認。
+  // 現在は401をexpectedStatusesに指定していないため、HTTP失敗率にも算入される。
   // -------------------------
   const afterLogoutMe = http.get(
     `${API_URL}/api/me`,

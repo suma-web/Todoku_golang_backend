@@ -1,3 +1,4 @@
+// フロントHTTP疎通試験: 5 VUで30秒間トップページをGETする。画面描画やログインは行わない。
 import http from "k6/http";
 import { check, sleep } from "k6";
 
@@ -16,6 +17,7 @@ export const options = {
 };
 
 export default function () {
+  // HTMLのHTTP応答のみ測定する。JavaScript実行や追加リソースの取得は行わない。
   const res = http.get(BASE_URL);
 
   check(res, {
@@ -23,5 +25,6 @@ export default function () {
     "response time < 1s": (r) => r.timings.duration < 1000,
   });
 
+  // 各反復の末尾で1秒待機する。
   sleep(1);
 }
