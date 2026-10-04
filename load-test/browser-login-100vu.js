@@ -1,3 +1,4 @@
+// ブラウザログイン試験: Chromiumで100 VUが各1回実行する（最大2分）。
 import { browser } from "k6/browser";
 import { check, sleep } from "k6";
 import { SharedArray } from "k6/data";
@@ -15,6 +16,7 @@ export const options = {
     browser_test: {
       executor: "per-vu-iterations",
 
+      // 100 VUで並行実行する。厳密な同時送信は保証しない。
       vus: 100,
       iterations: 1,
 
@@ -45,7 +47,7 @@ export default async function () {
   const page = await browser.newPage();
 
   /*
-   * VUごとにユーザーを割り当てる
+   * VUごとにユーザーを割り当てる（ユーザー数が不足すると同じアカウントを再利用）
    */
   const user =
     users[(__VU - 1) % users.length];
@@ -57,7 +59,7 @@ export default async function () {
     await page.goto(BASE_URL);
 
     /*
-     * 2. 認証判定待ち
+     * 2. 認証判定を想定して1秒固定待機（判定完了を直接待つ処理ではない）
      */
     await page.waitForTimeout(1000);
 
@@ -66,7 +68,7 @@ export default async function () {
     );
 
     /*
-     * 3. ログイン
+     * 3. URLに/loginが含まれる場合のみログインフォームを送信
      */
     if (page.url().includes("/login")) {
       await page
@@ -83,7 +85,7 @@ export default async function () {
     }
 
     /*
-     * 4. ログイン処理待ち
+     * 4. ログイン処理を想定して2秒固定待機
      */
     await page.waitForTimeout(2000);
 
@@ -92,7 +94,7 @@ export default async function () {
     );
 
     /*
-     * 5. ログイン成功確認
+     * 5. URLに/loginが含まれないことを確認（認証済みデータの表示は確認しない）
      */
     check(page, {
       "login succeeded": (p) =>
@@ -100,7 +102,7 @@ export default async function () {
     });
 
     /*
-     * 実際のユーザーが画面を見る時間を再現
+     * 画面を見る時間として2〜5秒待機
      */
     sleep(
       Math.random() * 3 + 2
